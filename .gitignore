@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+*.user
+Directory.Build.props
+artifacts/
+.cursorrules
+.cursor/
+ffmpeg.exe
+local_build_scripts/
+_buildroot/
+.debug/
