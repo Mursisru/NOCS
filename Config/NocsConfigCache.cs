@@ -18,7 +18,7 @@ namespace NOCS.Config
         internal static WeaponPriority WeaponPriority = WeaponPriority.IR_First;
         internal static WeaponFilterMode WeaponFilterMode = WeaponFilterMode.AntiMissileOnly;
 
-        internal static bool RenderAseCircle = true;
+        internal static bool RenderAseCircle = false;
         internal static bool RenderRadialText = true;
         internal static float AseVisualScale = 1f;
 
@@ -34,6 +34,7 @@ namespace NOCS.Config
         internal static float MinArmDistSlack = 1f;
 
         internal static float AseGateToleranceAngle = 0f;
+        internal static bool RequireAseScreenShoot = false;
         internal static float LaunchCooldown = 0.35f;
         internal static float MaxCpaMeters = 50f;
         internal static float MaxTimingTickDt;
@@ -88,6 +89,7 @@ namespace NOCS.Config
             MinArmDistSlack = Mathf.Max(0.1f, s.MinArmDistSlack);
 
             AseGateToleranceAngle = Mathf.Clamp(s.AseGateToleranceAngle, 0f, 180f);
+            RequireAseScreenShoot = s.RequireAseScreenShoot;
             LaunchCooldown = Mathf.Clamp(s.LaunchCooldown, 0.05f, 2f);
             MaxCpaMeters = Mathf.Clamp(s.MaxCpaMeters, 10f, 200f);
             MaxTimingTickDt = s.MaxTimingTickDt;

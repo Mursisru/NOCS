@@ -13,6 +13,7 @@ namespace NOCS.HardKill
 
         private static AseCircleView? _aseView;
         private static Transform? _aseCanvas;
+        private static SwarmInterceptSample _lastAseSample;
 
         internal static void RunTick(float dt)
         {
@@ -39,14 +40,25 @@ namespace NOCS.HardKill
             ThreatEngagementLedger.PruneInvalid();
 
             WeaponStation? defensive = ResolveActiveDefensiveStation(aircraft!);
-            SwarmInterceptSample swarmSample = UpdateAsePreview(aircraft!, defensive);
+            SwarmInterceptSample sample = UpdateAsePreview(aircraft!, defensive);
+            _lastAseSample = sample;
 
             if (NocsHotKey.WasPressed(NocsConfigCache.HotKeyModifier, NocsConfigCache.HotKey))
             {
-                if (Session.Active)
-                    Allocator.ExtendEngagement(aircraft!, defensive);
-                else if (Allocator.PrepareEngagement(aircraft!, defensive))
-                    BeginSession(aircraft!);
+                WeaponStation? triggerStation = Session.Active
+                    ? Allocator.ResolveGateStation(defensive)
+                    : defensive;
+
+                if (HotTriggerGate.IsSalvoTriggerAllowed(in sample, triggerStation, aircraft!))
+                {
+                    if (Session.Active)
+                        Allocator.ExtendEngagement(aircraft!, defensive);
+                    else if (Allocator.PrepareEngagement(aircraft!, defensive))
+                        BeginSession(aircraft!);
+
+                    if (Session.Active && !Allocator.IsSalvoComplete)
+                        Allocator.RunSalvo(aircraft!, 0f, triggerStation);
+                }
             }
 
             if (!Session.Active)
@@ -54,13 +66,22 @@ namespace NOCS.HardKill
 
             if (Allocator.IsSalvoComplete)
             {
+                if (Allocator.TryKeepSessionAlive(aircraft!, defensive))
+                {
+                    WeaponStation? resumeStation = Allocator.ResolveGateStation(defensive);
+                    if (HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, resumeStation, aircraft!))
+                        Allocator.RunSalvo(aircraft!, dt, resumeStation);
+                    return;
+                }
+
                 if (Session.PendingOwnLaunches <= 0)
                     FinishSession(aircraft!);
                 return;
             }
 
             WeaponStation? gateStation = Allocator.ResolveGateStation(defensive);
-            Allocator.RunSalvo(aircraft!, dt, gateStation);
+            if (HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, gateStation, aircraft!))
+                Allocator.RunSalvo(aircraft!, dt, gateStation);
         }
 
         internal static void NotifySalvoLaunchCommitted()
@@ -76,7 +97,8 @@ namespace NOCS.HardKill
             if (missile == null || missile.owner == null)
                 return;
 
-            if (!NocsGuard.IsLocalPlayerAircraft(missile.owner as Aircraft))
+            Aircraft? owner = missile.owner as Aircraft;
+            if (!NocsGuard.IsLocalPlayerAircraft(owner))
                 return;
 
             if (Session.PendingOwnLaunches > 0)
@@ -88,8 +110,8 @@ namespace NOCS.HardKill
             if (!Allocator.IsSalvoComplete)
                 return;
 
-            Aircraft? owner = missile.owner as Aircraft;
-            if (!NocsGuard.IsLocalPlayerAircraft(owner))
+            WeaponStation? defensive = ResolveActiveDefensiveStation(owner!);
+            if (Allocator.TryKeepSessionAlive(owner!, defensive))
                 return;
 
             FinishSession(owner!);
@@ -150,21 +172,20 @@ namespace NOCS.HardKill
             Aircraft aircraft,
             WeaponStation? defensive)
         {
-            if (!NocsConfigCache.RenderAseCircle)
+            IReadOnlyList<Missile> threats = MwsThreatFilter.GetPreviewScratch(aircraft, defensive);
+            if (threats.Count == 0)
             {
                 _aseView?.SetVisible(false);
                 return default;
             }
 
-            IReadOnlyList<Missile> threats = MwsThreatFilter.GetPreviewScratch(aircraft, defensive);
-            if (threats.Count == 0)
+            SwarmInterceptSample sample = SwarmInterceptGeometry.Compute(aircraft, threats, defensive);
+            if (!NocsConfigCache.RenderAseCircle && !NocsConfigCache.RenderRadialText)
             {
-                if (!Session.Active)
-                    _aseView?.SetVisible(false);
-                return default;
+                _aseView?.SetVisible(false);
+                return sample;
             }
 
-            SwarmInterceptSample sample = SwarmInterceptGeometry.Compute(aircraft, threats, defensive);
             EnsureAseView();
             _aseView?.Apply(in sample, aircraft, defensive);
             return sample;

@@ -37,6 +37,7 @@ namespace NOCS.Config
         internal static ConfigEntry<float> MinArmDistSlack { get; private set; } = null!;
 
         internal static ConfigEntry<float> AseGateToleranceAngle { get; private set; } = null!;
+        internal static ConfigEntry<bool> RequireAseScreenShoot { get; private set; } = null!;
         internal static ConfigEntry<float> LaunchCooldown { get; private set; } = null!;
         internal static ConfigEntry<float> MaxCpaMeters { get; private set; } = null!;
         internal static ConfigEntry<float> MaxTimingTickDt { get; private set; } = null!;
@@ -71,12 +72,12 @@ namespace NOCS.Config
                 "Station filter mode.");
 
             const string hudVisuals = "1. HUD Visuals";
-            RenderAseCircle = config.Bind(hudVisuals, "RenderAseCircle", true,
-                "Draw the ASE intercept ring on the HUD. When off, the ring is hidden but launch logic still runs.");
+            RenderAseCircle = config.Bind(hudVisuals, "ShowAseInterceptRing", false,
+                "Show ASE intercept ring with arc SHOOT / POTENTIAL HIT labels on the ring circumference.");
             RenderRadialText = config.Bind(hudVisuals, "RenderRadialText", true,
-                "Show SHOOT / POSSIBLE HIT radial cue labels around the ASE ring.");
+                "Show SHOOT / POTENTIAL HIT status cue under the weapon HUD hint (typography from hint, color from notch rectangle).");
             AseVisualScale = config.Bind(hudVisuals, "AseVisualScale", 1f,
-                new ConfigDescription("Visual scale multiplier for ASE ring and cue labels.", new AcceptableValueRange<float>(0.5f, 2f)));
+                new ConfigDescription("Legacy visual scale (unused while ring is disabled).", new AcceptableValueRange<float>(0.5f, 2f)));
 
             const string envelope = "2. Engagement Envelope";
             AbsoluteMaxEngagementRange = config.Bind(envelope, "AbsoluteMaxEngagementRange", 15000f,
@@ -103,6 +104,8 @@ namespace NOCS.Config
             const string fireControl = "3. Fire Control & Geometry";
             AseGateToleranceAngle = config.Bind(fireControl, "AseGateToleranceAngle", 0f,
                 new ConfigDescription("Aiming angle tolerance in degrees. 0 = strict ASE ring; 180 = open gate (any direction).", new AcceptableValueRange<float>(0f, 180f)));
+            RequireAseScreenShoot = config.Bind(fireControl, "RequireAseScreenShoot", false,
+                "When true, hotkey salvo requires gun cross inside the on-screen ASE circle (first-person HUD). Default off — salvo uses threat/range gates only (works in third person and when looking away).");
             LaunchCooldown = config.Bind(fireControl, "LaunchCooldown", 0.35f,
                 new ConfigDescription("Delay between salvo launches in seconds (T_salvo_queue).", new AcceptableValueRange<float>(0.05f, 2f)));
             MaxCpaMeters = config.Bind(fireControl, "MaxCpaMeters", 50f,
@@ -155,6 +158,7 @@ namespace NOCS.Config
                 AseInterceptConfidence = AseInterceptConfidence.Value,
                 MinArmDistSlack = MinArmDistSlack.Value,
                 AseGateToleranceAngle = AseGateToleranceAngle.Value,
+                RequireAseScreenShoot = RequireAseScreenShoot.Value,
                 LaunchCooldown = LaunchCooldown.Value,
                 MaxCpaMeters = MaxCpaMeters.Value,
                 MaxTimingTickDt = MaxTimingTickDt.Value,
@@ -193,6 +197,7 @@ namespace NOCS.Config
             AseInterceptConfidence.SettingChanged += OnAnySettingChanged;
             MinArmDistSlack.SettingChanged += OnAnySettingChanged;
             AseGateToleranceAngle.SettingChanged += OnAnySettingChanged;
+            RequireAseScreenShoot.SettingChanged += OnAnySettingChanged;
             LaunchCooldown.SettingChanged += OnAnySettingChanged;
             MaxCpaMeters.SettingChanged += OnAnySettingChanged;
             MaxTimingTickDt.SettingChanged += OnAnySettingChanged;
@@ -236,6 +241,7 @@ namespace NOCS.Config
         internal float AseInterceptConfidence;
         internal float MinArmDistSlack;
         internal float AseGateToleranceAngle;
+        internal bool RequireAseScreenShoot;
         internal float LaunchCooldown;
         internal float MaxCpaMeters;
         internal float MaxTimingTickDt;

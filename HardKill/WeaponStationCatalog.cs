@@ -161,7 +161,7 @@ namespace NOCS.HardKill
             if (!station.WeaponInfo.missile || station.Ammo <= 0)
                 return false;
 
-            if (station.SafetyIsOn(aircraft) || !station.Ready())
+            if (station.SafetyIsOn(aircraft))
                 return false;
 
             SeekerKind kind = SeekerParamCache.ResolveSeekerKind(station);

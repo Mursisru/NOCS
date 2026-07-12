@@ -33,13 +33,7 @@ namespace NOCS.HardKill
                 return false;
 
             float dist = (aircraftRb.position - threatRb.position).magnitude;
-            if (dist < MinCommittedLaunchDistM)
-                return false;
-
-            if (defensiveStation == null)
-                return true;
-
-            return InterceptGeometry.IsInEnvelope(dist, defensiveStation);
+            return dist >= MinCommittedLaunchDistM;
         }
 
         internal static bool IsAutoLaunchAllowed(
@@ -77,6 +71,35 @@ namespace NOCS.HardKill
                 return true;
 
             return InterceptGeometry.IsInEnvelope(dist, defensiveStation);
+        }
+
+        internal static bool IsAseShootCueActive(
+            in SwarmInterceptSample sample,
+            WeaponStation? defensiveStation,
+            Aircraft aircraft)
+        {
+            if (!sample.Valid || sample.ThreatCount <= 0)
+                return false;
+
+            if (defensiveStation != null)
+                return IsLaunchAllowed(in sample, defensiveStation, aircraft);
+
+            Vector2 gunCross = ResolveGunCrossScreenPos();
+            if (gunCross.x < 0f)
+                return false;
+
+            return CircleContains(in sample, gunCross);
+        }
+
+        internal static bool IsSalvoTriggerAllowed(
+            in SwarmInterceptSample sample,
+            WeaponStation? defensiveStation,
+            Aircraft aircraft)
+        {
+            if (!NocsConfigCache.RequireAseScreenShoot)
+                return true;
+
+            return IsAseShootCueActive(in sample, defensiveStation, aircraft);
         }
 
         internal static bool IsLaunchAllowed(

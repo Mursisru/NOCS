@@ -20,6 +20,7 @@ namespace NOCS.HardKill
 
         private static readonly List<Missile> PreviewScratch = new List<Missile>(MaxThreats);
         private static readonly List<Missile> EngageScratch = new List<Missile>(MaxThreats);
+        private static readonly List<Missile> SalvoScratch = new List<Missile>(MaxThreats);
         private static readonly int[] CandidateIndices = new int[MaxThreats];
         private static readonly float[] CandidateDist = new float[MaxThreats];
         private static readonly float[] CandidateClosure = new float[MaxThreats];
@@ -31,6 +32,8 @@ namespace NOCS.HardKill
         private static Aircraft? _cachedPreviewAircraft;
         private static int _cachedEngageFrame = -1;
         private static Aircraft? _cachedEngageAircraft;
+        private static int _cachedSalvoFrame = -1;
+        private static Aircraft? _cachedSalvoAircraft;
 
         private static int _activeWeaponFrame = -1;
         private static Aircraft? _activeWeaponAircraft;
@@ -46,6 +49,7 @@ namespace NOCS.HardKill
         {
             PreviewScratch.Clear();
             EngageScratch.Clear();
+            SalvoScratch.Clear();
             InvalidateFrameCache();
         }
 
@@ -55,6 +59,8 @@ namespace NOCS.HardKill
             _cachedPreviewAircraft = null;
             _cachedEngageFrame = -1;
             _cachedEngageAircraft = null;
+            _cachedSalvoFrame = -1;
+            _cachedSalvoAircraft = null;
             _activeWeaponFrame = -1;
             _activeWeaponAircraft = null;
             _activeWeaponPreferred = null;
@@ -90,6 +96,23 @@ namespace NOCS.HardKill
             return EngageScratch;
         }
 
+        internal static IReadOnlyList<Missile> GetSalvoScratch(Aircraft aircraft)
+        {
+            int frame = Time.frameCount;
+            if (ReferenceEquals(_cachedSalvoAircraft, aircraft) && _cachedSalvoFrame == frame)
+                return SalvoScratch;
+
+            _cachedSalvoFrame = frame;
+            _cachedSalvoAircraft = aircraft;
+            CollectSalvoRaw(aircraft, SalvoScratch);
+            return SalvoScratch;
+        }
+
+        internal static int CountSalvoThreats(Aircraft aircraft)
+        {
+            return GetSalvoScratch(aircraft).Count;
+        }
+
         internal static int CollectVisual(Aircraft aircraft, List<Missile> buffer, WeaponStation? defensiveStation)
         {
             return Collect(aircraft, buffer, defensiveStation, MwsCollectMode.Preview);
@@ -101,6 +124,45 @@ namespace NOCS.HardKill
             WeaponStation? defensiveStation)
         {
             return Collect(aircraft, buffer, defensiveStation, MwsCollectMode.Engage);
+        }
+
+        internal static int CollectSalvoRaw(Aircraft aircraft, List<Missile> buffer)
+        {
+            buffer.Clear();
+            if (!NocsGuard.IsValidUnit(aircraft) || aircraft!.rb == null)
+                return 0;
+
+            MissileWarning? warning = aircraft.GetMissileWarningSystem();
+            if (warning?.knownMissiles == null)
+                return 0;
+
+            BuildScanList(warning, includeUnknown: true);
+
+            Vector3 acPos = aircraft.rb.position;
+            PersistentID selfId = aircraft.persistentID;
+            FactionHQ? playerHq = aircraft.NetworkHQ;
+            float maxRange = NocsConfigCache.AbsoluteMaxEngagementRange;
+
+            List<Missile> scan = ScanMissiles;
+            for (int i = 0; i < scan.Count; i++)
+            {
+                Missile? missile = scan[i];
+                if (!IsSalvoThreatOnSelf(missile, selfId, playerHq))
+                    continue;
+
+                Rigidbody? missileRb = missile!.rb;
+                if (missileRb == null)
+                    continue;
+
+                float dist = (acPos - missileRb.position).magnitude;
+                if (dist < 1f || dist > maxRange)
+                    continue;
+
+                TryAddUnique(buffer, missile);
+            }
+
+            SortBufferByDistance(buffer, acPos);
+            return buffer.Count;
         }
 
         internal static int Collect(
@@ -206,19 +268,39 @@ namespace NOCS.HardKill
                         maxCpa,
                         out _))
                 {
-                    continue;
+                    if (!(previewMode && ThreatKinematics.PassesPreviewAppearDistance(dist)))
+                        continue;
                 }
 
                 if (applyArmGate && dist <= closure * tArm * armSlack)
                     continue;
 
-                if (candidateCount >= MaxThreats)
-                    break;
+                if (candidateCount < MaxThreats)
+                {
+                    CandidateIndices[candidateCount] = i;
+                    CandidateDist[candidateCount] = dist;
+                    CandidateClosure[candidateCount] = closure;
+                    candidateCount++;
+                    continue;
+                }
 
-                CandidateIndices[candidateCount] = i;
-                CandidateDist[candidateCount] = dist;
-                CandidateClosure[candidateCount] = closure;
-                candidateCount++;
+                int farthest = 0;
+                float farthestDist = CandidateDist[0];
+                for (int c = 1; c < candidateCount; c++)
+                {
+                    if (CandidateDist[c] <= farthestDist)
+                        continue;
+
+                    farthestDist = CandidateDist[c];
+                    farthest = c;
+                }
+
+                if (dist >= farthestDist)
+                    continue;
+
+                CandidateIndices[farthest] = i;
+                CandidateDist[farthest] = dist;
+                CandidateClosure[farthest] = closure;
             }
 
             if (candidateCount == 0)
@@ -424,15 +506,52 @@ namespace NOCS.HardKill
             return dist <= maxMissileRange * rangeFactor;
         }
 
-        private static bool IsEngageableThreatOnSelf(Missile missile, PersistentID selfId, FactionHQ? playerHq)
+        private static bool IsSalvoThreatOnSelf(Missile? missile, PersistentID selfId, FactionHQ? playerHq)
         {
             if (!NocsGuard.IsValidMissile(missile))
                 return false;
 
-            if (missile.targetID != selfId)
+            if (missile!.targetID != selfId)
                 return false;
 
             if (playerHq != null && missile.NetworkHQ == playerHq)
+                return false;
+
+            return true;
+        }
+
+        private static void SortBufferByDistance(List<Missile> buffer, Vector3 acPos)
+        {
+            int count = buffer.Count;
+            if (count <= 1)
+                return;
+
+            for (int i = 1; i < count; i++)
+            {
+                Missile key = buffer[i];
+                float keyDist = DistanceTo(key, acPos);
+                int j = i - 1;
+                while (j >= 0 && DistanceTo(buffer[j], acPos) > keyDist)
+                {
+                    buffer[j + 1] = buffer[j];
+                    j--;
+                }
+
+                buffer[j + 1] = key;
+            }
+        }
+
+        private static float DistanceTo(Missile missile, Vector3 acPos)
+        {
+            if (missile == null || missile.rb == null)
+                return float.MaxValue;
+
+            return (acPos - missile.rb.position).magnitude;
+        }
+
+        private static bool IsEngageableThreatOnSelf(Missile missile, PersistentID selfId, FactionHQ? playerHq)
+        {
+            if (!IsSalvoThreatOnSelf(missile, selfId, playerHq))
                 return false;
 
             SeekerKind kind = SeekerParamCache.ResolveSeekerKind(missile);
@@ -442,9 +561,9 @@ namespace NOCS.HardKill
             if (NocsConfigCache.EngageIrThreats && SeekerParamCache.IsIrSeeker(kind))
                 return true;
 
-            // Early ARH/SARH may report empty seeker string while already in active lock/search.
             if (kind == SeekerKind.None
-                && missile.seekerMode < Missile.SeekerMode.passive)
+                || kind == SeekerKind.Other
+                || missile.seekerMode < Missile.SeekerMode.passive)
             {
                 return true;
             }

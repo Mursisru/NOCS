@@ -203,9 +203,7 @@ namespace NOCS.HardKill
             if (!envelope.Valid || envelope.ScreenRadiusPx <= 0f)
                 return false;
 
-            if (!TryResolveGunCrossScreenPos(out center))
-                center = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-
+            center = envelope.ScreenCenter;
             radiusPx = ClampMergedRadius(envelope.ScreenRadiusPx);
             return radiusPx > 0f;
         }
@@ -249,12 +247,6 @@ namespace NOCS.HardKill
 
         private static bool TryResolveNeutralCenter(out Vector2 center)
         {
-            if (TryResolveGunCrossScreenPos(out Vector2 gunCross))
-            {
-                center = gunCross;
-                return true;
-            }
-
             float centerX = 0f;
             float centerY = 0f;
             for (int i = 0; i < _envelopeCount; i++)
@@ -302,20 +294,6 @@ namespace NOCS.HardKill
             }
 
             return dominantIndex >= 0;
-        }
-
-        private static bool TryResolveGunCrossScreenPos(out Vector2 screenPoint)
-        {
-            FlightHud? hud = SceneSingleton<FlightHud>.i;
-            if (hud == null || hud.velocityVector == null)
-            {
-                screenPoint = default;
-                return false;
-            }
-
-            Vector3 pos = hud.velocityVector.transform.position;
-            screenPoint = new Vector2(pos.x, pos.y);
-            return true;
         }
     }
 }
