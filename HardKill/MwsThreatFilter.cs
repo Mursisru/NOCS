@@ -17,6 +17,8 @@ namespace NOCS.HardKill
         private const int MaxThreats = 8;
         private const float MinRelVelSqr = 0.001f;
         private const float MinDefensiveSpeedMps = 50f;
+        private const float FovConeAngleDeg = 50f;
+        private static readonly float FovHalfCos = Mathf.Cos((FovConeAngleDeg * 0.5f) * Mathf.Deg2Rad);
 
         private static readonly List<Missile> PreviewScratch = new List<Missile>(MaxThreats);
         private static readonly List<Missile> EngageScratch = new List<Missile>(MaxThreats);
@@ -139,22 +141,32 @@ namespace NOCS.HardKill
             BuildScanList(warning, includeUnknown: true);
 
             Vector3 acPos = aircraft.rb.position;
+            Vector3 noseForward = aircraft.transform.forward;
             PersistentID selfId = aircraft.persistentID;
             FactionHQ? playerHq = aircraft.NetworkHQ;
-            float maxRange = NocsConfigCache.AbsoluteMaxEngagementRange;
+            float maxRange = NocsConfigCache.MaxLaunchRangeMeters;
 
             List<Missile> scan = ScanMissiles;
             for (int i = 0; i < scan.Count; i++)
             {
                 Missile? missile = scan[i];
-                if (!IsSalvoThreatOnSelf(missile, selfId, playerHq))
+                if (missile == null)
                     continue;
 
-                Rigidbody? missileRb = missile!.rb;
+                Rigidbody? missileRb = missile.rb;
                 if (missileRb == null)
                     continue;
 
-                float dist = (acPos - missileRb.position).magnitude;
+                Vector3 mPos = missileRb.position;
+
+                // Absolute first filter: nose FOV 50° — out-of-cone never enters threat set.
+                if (!IsInsideNoseFov(noseForward, acPos, mPos))
+                    continue;
+
+                if (!IsEngageableThreatOnSelf(missile, selfId, playerHq))
+                    continue;
+
+                float dist = (acPos - mPos).magnitude;
                 if (dist < 1f || dist > maxRange)
                     continue;
 
@@ -192,6 +204,7 @@ namespace NOCS.HardKill
             Rigidbody aircraftRb = aircraft.rb;
             Vector3 acPos = aircraftRb.position;
             Vector3 acVel = aircraftRb.velocity;
+            Vector3 noseForward = aircraft.transform.forward;
 
             PersistentID selfId = aircraft.persistentID;
             FactionHQ? playerHq = aircraft.NetworkHQ;
@@ -201,7 +214,7 @@ namespace NOCS.HardKill
             MsnParams msn = SeekerParamCache.GetMsnParams(activeWeapon);
             float tArm = msn.ArmDelaySec;
             float armSlack = Mathf.Max(0.1f, NocsConfigCache.MinArmDistSlack);
-            float maxCpa = Mathf.Max(1f, NocsConfigCache.MaxCpaMeters);
+            float maxCpa = Mathf.Max(1f, NocsConfigCache.MissDistanceToleranceMeters);
             float maxMissileRange = Mathf.Max(1f, msn.MaxRangeM);
             float defensiveSpeed = Mathf.Max(MinDefensiveSpeedMps, msn.MaxSpeedMps);
             float launchCooldown = Mathf.Max(0f, msn.LaunchCooldownSec);
@@ -221,11 +234,15 @@ namespace NOCS.HardKill
                 if (missileRb == null)
                     continue;
 
-                // Rule 0: Guidance Check — radar by default; IR only when EngageIrThreats is on.
+                Vector3 mPos = missileRb.position;
+
+                // Absolute first filter: nose FOV 50° — before seeker / CPA / ASE.
+                if (!IsInsideNoseFov(noseForward, acPos, mPos))
+                    continue;
+
                 if (!IsEngageableThreatOnSelf(missile, selfId, playerHq))
                     continue;
 
-                Vector3 mPos = missileRb.position;
                 if (!previewMode)
                 {
                     Vector3 threatDir = mPos - camPos;
@@ -238,7 +255,7 @@ namespace NOCS.HardKill
                 if (dist < 1f)
                     continue;
 
-                if (dist > NocsConfigCache.AbsoluteMaxEngagementRange)
+                if (dist > NocsConfigCache.MaxLaunchRangeMeters)
                     continue;
 
                 Vector3 los = toAircraft / dist;
@@ -344,7 +361,7 @@ namespace NOCS.HardKill
             if (dist < 1f)
                 return false;
 
-            if (dist > NocsConfigCache.AbsoluteMaxEngagementRange)
+            if (dist > NocsConfigCache.MaxLaunchRangeMeters)
                 return false;
 
             float effectiveClosure = Mathf.Max(closure, NocsConfigCache.ClosureMinThreshold);
@@ -549,26 +566,25 @@ namespace NOCS.HardKill
             return (acPos - missile.rb.position).magnitude;
         }
 
-        private static bool IsEngageableThreatOnSelf(Missile missile, PersistentID selfId, FactionHQ? playerHq)
+        private static bool IsEngageableThreatOnSelf(Missile? missile, PersistentID selfId, FactionHQ? playerHq)
         {
             if (!IsSalvoThreatOnSelf(missile, selfId, playerHq))
                 return false;
 
             SeekerKind kind = SeekerParamCache.ResolveSeekerKind(missile);
-            if (SeekerParamCache.IsRadarSeeker(kind))
-                return true;
+            return SeekerParamCache.IsRadarSeeker(kind);
+        }
 
-            if (NocsConfigCache.EngageIrThreats && SeekerParamCache.IsIrSeeker(kind))
-                return true;
+        private static bool IsInsideNoseFov(Vector3 noseForward, Vector3 aircraftPos, Vector3 threatPos)
+        {
+            Vector3 toThreat = threatPos - aircraftPos;
+            float sqr = toThreat.sqrMagnitude;
+            if (sqr < 0.0001f)
+                return false;
 
-            if (kind == SeekerKind.None
-                || kind == SeekerKind.Other
-                || missile.seekerMode < Missile.SeekerMode.passive)
-            {
-                return true;
-            }
-
-            return false;
+            float invLen = 1f / Mathf.Sqrt(sqr);
+            float cos = Vector3.Dot(noseForward, toThreat * invLen);
+            return cos >= FovHalfCos;
         }
 
         private static void TryAddUnique(List<Missile> buffer, Missile missile)

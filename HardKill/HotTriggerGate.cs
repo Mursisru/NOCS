@@ -116,7 +116,7 @@ namespace NOCS.HardKill
             if (!SwarmInterceptGeometry.AllEnvelopesInWeaponRange(station))
                 return false;
 
-            if (NocsConfigCache.AseGateToleranceAngle >= FullOpenToleranceDeg)
+            if (NocsConfigCache.ManualLaunchAimTolerance >= FullOpenToleranceDeg)
                 return true;
 
             Vector2 gunCross = ResolveGunCrossScreenPos();
@@ -137,7 +137,7 @@ namespace NOCS.HardKill
 
         internal static float ResolveTolerancePx()
         {
-            float angleDeg = NocsConfigCache.AseGateToleranceAngle;
+            float angleDeg = NocsConfigCache.ManualLaunchAimTolerance;
             if (angleDeg <= 0f)
                 return 0f;
 

@@ -22,8 +22,8 @@ namespace NOCS.Config
         internal static bool RenderRadialText = true;
         internal static float AseVisualScale = 1f;
 
-        internal static float AbsoluteMaxEngagementRange = 15000f;
-        internal static float AbsoluteMinEngagementRange = 150f;
+        internal static float MaxLaunchRangeMeters = 15000f;
+        internal static float MinLaunchRangeMeters = 150f;
         internal static float AseMaxRangeFactor = 1f;
         internal static float AsePreviewRangeFactor = 1f;
         internal static float AsePreviewAppearDistanceM = 5000f;
@@ -33,16 +33,15 @@ namespace NOCS.Config
         internal static float AseInterceptConfidence = 0.99f;
         internal static float MinArmDistSlack = 1f;
 
-        internal static float AseGateToleranceAngle = 0f;
+        internal static float ManualLaunchAimTolerance = 0f;
         internal static bool RequireAseScreenShoot = false;
         internal static float LaunchCooldown = 0.35f;
-        internal static float MaxCpaMeters = 50f;
+        internal static float MissDistanceToleranceMeters = 50f;
         internal static float MaxTimingTickDt;
 
         internal static bool WarningTtiEnabled = true;
         internal static float TtiSmoothingFactor = 0.08f;
         internal static float ClosureMinThreshold = 0.1f;
-        internal static bool EngageIrThreats = false;
 
         internal static void BindFromBepIn(in NocsConfigSnapshot snapshot)
         {
@@ -77,8 +76,8 @@ namespace NOCS.Config
             RenderRadialText = s.RenderRadialText;
             AseVisualScale = Mathf.Clamp(s.AseVisualScale, 0.5f, 2f);
 
-            AbsoluteMaxEngagementRange = Mathf.Clamp(s.AbsoluteMaxEngagementRange, 1000f, 100000f);
-            AbsoluteMinEngagementRange = Mathf.Clamp(s.AbsoluteMinEngagementRange, 0f, 2000f);
+            MaxLaunchRangeMeters = Mathf.Clamp(s.MaxLaunchRangeMeters, 1000f, 100000f);
+            MinLaunchRangeMeters = Mathf.Clamp(s.MinLaunchRangeMeters, 0f, 2000f);
             AseMaxRangeFactor = Mathf.Clamp(s.AseMaxRangeFactor, 0.5f, 1.5f);
             AsePreviewRangeFactor = Mathf.Max(0.01f, s.AsePreviewRangeFactor);
             AsePreviewAppearDistanceM = Mathf.Clamp(s.AsePreviewAppearDistanceM, 500f, 50000f);
@@ -88,16 +87,15 @@ namespace NOCS.Config
             AseInterceptConfidence = Mathf.Clamp(s.AseInterceptConfidence, 0.5f, 0.999f);
             MinArmDistSlack = Mathf.Max(0.1f, s.MinArmDistSlack);
 
-            AseGateToleranceAngle = Mathf.Clamp(s.AseGateToleranceAngle, 0f, 180f);
+            ManualLaunchAimTolerance = Mathf.Clamp(s.ManualLaunchAimTolerance, 0f, 180f);
             RequireAseScreenShoot = s.RequireAseScreenShoot;
             LaunchCooldown = Mathf.Clamp(s.LaunchCooldown, 0.05f, 2f);
-            MaxCpaMeters = Mathf.Clamp(s.MaxCpaMeters, 10f, 200f);
+            MissDistanceToleranceMeters = Mathf.Clamp(s.MissDistanceToleranceMeters, 10f, 200f);
             MaxTimingTickDt = s.MaxTimingTickDt;
 
             WarningTtiEnabled = s.WarningTtiEnabled;
             TtiSmoothingFactor = Mathf.Clamp(s.TtiSmoothingFactor, 0.01f, 1f);
             ClosureMinThreshold = Mathf.Max(0.01f, s.ClosureMinThreshold);
-            EngageIrThreats = s.EngageIrThreats;
         }
     }
 }

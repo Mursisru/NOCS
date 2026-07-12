@@ -176,9 +176,9 @@ namespace NOCS.HardKill
 
         private static int ComparePriority(WeaponStationEntry a, WeaponStationEntry b)
         {
-            bool irFirst = NocsConfigCache.WeaponPriority == WeaponPriority.IR_First;
+            // Hard MP: IR interceptors always before radar.
             if (a.IsIr != b.IsIr)
-                return irFirst ? (a.IsIr ? -1 : 1) : (a.IsIr ? 1 : -1);
+                return a.IsIr ? -1 : 1;
 
             return a.ArmDelay.CompareTo(b.ArmDelay);
         }

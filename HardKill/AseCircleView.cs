@@ -20,6 +20,7 @@ namespace NOCS.HardKill
         private const string TextShoot = "SHOOT";
         private const string TextPotentialHit = "POTENTIAL HIT";
         private const float StatusCueGapLocalPx = 18f;
+        private const float LayoutHysteresisPx = 2f;
 
         private static readonly float[] LabelAnglesDeg = { 45f, 135f, 225f, 315f };
         private static readonly string[] ShootGlyphs = BuildGlyphCache(TextShoot);
@@ -56,6 +57,9 @@ namespace NOCS.HardKill
         private float _lastStroke = -1f;
         private int _lastResolutionStamp = -1;
         private int _lastFillAlpha = -1;
+        private float _displayedDiameter = -1f;
+        private float _displayedCenterX = float.MinValue;
+        private float _displayedCenterY = float.MinValue;
         private CueMode _cueMode = CueMode.Hidden;
         private bool _ringVisible;
         private bool _arcLabelsVisible;
@@ -181,8 +185,28 @@ namespace NOCS.HardKill
 
             Color ringColor = AseNotchStyle.ResolveColor(sample.UrgentThreat);
             _ringImage.color = ringColor;
-            _ringRect.position = new Vector3(sample.ScreenCenter.x, sample.ScreenCenter.y, _ringRect.position.z);
-            _ringRect.sizeDelta = new Vector2(diameter, diameter);
+
+            float centerX = sample.ScreenCenter.x;
+            float centerY = sample.ScreenCenter.y;
+            bool sizeDirty = _displayedDiameter < 0f
+                || Mathf.Abs(diameter - _displayedDiameter) > LayoutHysteresisPx;
+            bool posDirty = _displayedCenterX == float.MinValue
+                || Mathf.Abs(centerX - _displayedCenterX) > LayoutHysteresisPx
+                || Mathf.Abs(centerY - _displayedCenterY) > LayoutHysteresisPx;
+
+            if (sizeDirty)
+            {
+                _displayedDiameter = diameter;
+                _ringRect.sizeDelta = new Vector2(diameter, diameter);
+            }
+
+            if (posDirty)
+            {
+                _displayedCenterX = centerX;
+                _displayedCenterY = centerY;
+                _ringRect.position = new Vector3(centerX, centerY, _ringRect.position.z);
+            }
+
             _ringRoot.transform.SetAsLastSibling();
             SetRingVisible(true);
 
@@ -193,7 +217,7 @@ namespace NOCS.HardKill
             }
 
             SetCueMode(mode);
-            float radiusPx = diameter * 0.5f;
+            float radiusPx = (_displayedDiameter > 0f ? _displayedDiameter : diameter) * 0.5f;
             if (!ArcLabelsFit(radiusPx, stroke, _activeGlyphCount))
             {
                 SetArcLabelsVisible(false);
@@ -201,7 +225,8 @@ namespace NOCS.HardKill
             }
 
             ApplyLabelColor(AseNotchStyle.ResolveLabelColor(ringColor));
-            LayoutArcLabels(radiusPx, stroke);
+            if (sizeDirty || !_arcLabelsVisible)
+                LayoutArcLabels(radiusPx, stroke);
             SetArcLabelsVisible(true);
         }
 

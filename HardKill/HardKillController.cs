@@ -38,18 +38,21 @@ namespace NOCS.HardKill
             }
 
             ThreatEngagementLedger.PruneInvalid();
+            Allocator.IsHardwareSalvoLocked();
 
             WeaponStation? defensive = ResolveActiveDefensiveStation(aircraft!);
             SwarmInterceptSample sample = UpdateAsePreview(aircraft!, defensive);
             _lastAseSample = sample;
 
+            bool hotkeySalvoThisTick = false;
             if (NocsHotKey.WasPressed(NocsConfigCache.HotKeyModifier, NocsConfigCache.HotKey))
             {
                 WeaponStation? triggerStation = Session.Active
                     ? Allocator.ResolveGateStation(defensive)
                     : defensive;
 
-                if (HotTriggerGate.IsSalvoTriggerAllowed(in sample, triggerStation, aircraft!))
+                if (!Allocator.IsHardwareSalvoLocked()
+                    && HotTriggerGate.IsSalvoTriggerAllowed(in sample, triggerStation, aircraft!))
                 {
                     if (Session.Active)
                         Allocator.ExtendEngagement(aircraft!, defensive);
@@ -57,19 +60,31 @@ namespace NOCS.HardKill
                         BeginSession(aircraft!);
 
                     if (Session.Active && !Allocator.IsSalvoComplete)
+                    {
                         Allocator.RunSalvo(aircraft!, 0f, triggerStation);
+                        hotkeySalvoThisTick = true;
+                    }
                 }
             }
 
             if (!Session.Active)
                 return;
 
+            if (Allocator.IsHardwareSalvoLocked())
+            {
+                // Keep session alive for remaining threats, but never spin fire while locked.
+                if (Allocator.IsSalvoComplete)
+                    Allocator.TryKeepSessionAlive(aircraft!, defensive);
+                return;
+            }
+
             if (Allocator.IsSalvoComplete)
             {
                 if (Allocator.TryKeepSessionAlive(aircraft!, defensive))
                 {
                     WeaponStation? resumeStation = Allocator.ResolveGateStation(defensive);
-                    if (HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, resumeStation, aircraft!))
+                    if (!hotkeySalvoThisTick
+                        && HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, resumeStation, aircraft!))
                         Allocator.RunSalvo(aircraft!, dt, resumeStation);
                     return;
                 }
@@ -80,7 +95,8 @@ namespace NOCS.HardKill
             }
 
             WeaponStation? gateStation = Allocator.ResolveGateStation(defensive);
-            if (HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, gateStation, aircraft!))
+            if (!hotkeySalvoThisTick
+                && HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, gateStation, aircraft!))
                 Allocator.RunSalvo(aircraft!, dt, gateStation);
         }
 
@@ -121,6 +137,7 @@ namespace NOCS.HardKill
         {
             Session.Reset();
             Allocator.Reset();
+            ThreatEngagementLedger.Reset();
             WeaponStationCatalog.InvalidateFrameCache();
         }
 

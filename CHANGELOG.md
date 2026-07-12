@@ -6,6 +6,77 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+## [0.5.23] — 2026-07-12
+
+### Fixed
+
+- **Double intercept on one target** — engagement ledger now persists for live threats (cleared only on aircraft reset / dispose, or when the missile dies). Pair cooldown no longer wipes allocation memory; targets are reserved before launch with rollback on failed fire. Queue dedup uses `persistentID`; hotkey no longer runs two salvo steps in the same tick.
+
+### Build
+
+- Display version: `0.5.23QV`
+- BepInPlugin semver: `0.5.23`
+
+## [0.5.22] — 2026-07-12
+
+### Fixed
+
+- **Post-salvo re-fire blocked forever** — `ThreatEngagementLedger` now clears when the 1.8 s pair cooldown expires and when a session finishes, so the next pair or new engagement can allocate targets again.
+
+### Build
+
+- Display version: `0.5.22QV`
+- BepInPlugin semver: `0.5.22`
+
+## [0.5.21] — 2026-07-12
+
+### Fixed
+
+- **Hard freeze on large missile swarms** — failed launches no longer wrap the threat queue inside a single frame (`AdvanceQueue` → `FindNextEngageIndex` loop). Salvo step now uses forward-only advance + hard pass cap (`MaxQueue`).
+
+### Build
+
+- Display version: `0.5.21QV`
+- BepInPlugin semver: `0.5.21`
+
+## [0.5.20] — 2026-07-12
+
+### Added
+
+- **Hard MP APS balance (immutable)** — private const gates, not exposed in Configuration Manager:
+  - Nose FOV cone **50°** (`FovConeAngleDeg`) — threats outside ±25° of aircraft forward are dropped **first**, before seeker/CPA/ASE, and never pollute priority.
+  - Threat type — **ARH/SARH only** (IR/optical/unknown seekers rejected in preview, engage, and salvo collect).
+  - Salvo window — max **2** launches per pair (`MaxSimultaneousTargets`), then hard **1.8 s** lock via `Time.time` (`SalvoCooldownSec`); lock survives session reset and is not overwritten while active.
+
+### Fixed
+
+- **FOV blinding** — out-of-cone missiles no longer enter scratch/queues or block frontal intercepts.
+- **Salvo cooldown** — pair lock uses `_lastSalvoTime = Time.time` at the 2nd launch; clears only after full 1.8 s.
+- **Deadlock after salvos** — `ThreatEngagementLedger.PruneInvalid` drops dead/disabled missiles; queue prunes invalid threats; hardware lock prevents premature `FinishSession`.
+- **Interceptor ammo priority** — IR stations always expended before radar stations.
+- **Target allocation** — each launch marks `IsIntercepted`; pair distributes across distinct unengaged threats.
+- **ASE HUD FPS** — 2 px hysteresis on ring `sizeDelta` / position / arc layout to avoid Canvas rebuild spam.
+
+### Changed
+
+- CM renames (English): `MaxLaunchRangeMeters`, `MinLaunchRangeMeters`, `MissDistanceToleranceMeters`, `ManualLaunchAimTolerance`.
+
+### Build
+
+- Display version: `0.5.20QV`
+- BepInPlugin semver: `0.5.20`
+
+## [0.5.19] — 2026-07-12
+
+### Removed
+
+- **`EngageIrThreats`** config entry — Hard-Kill remains radar-only (ARH/SARH); IR threats are not engageable via CM.
+
+### Build
+
+- Display version: `0.5.19QV`
+- BepInPlugin semver: `0.5.19`
+
 ## [0.5.18] — 2026-07-12
 
 ### Changed

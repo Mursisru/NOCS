@@ -26,6 +26,9 @@ namespace NOCS.HardKill
                 if (!NocsUnitLookup.TryGetLiveUnit(id, out Unit unit))
                     continue;
 
+                if (unit is not Missile missile || !NocsGuard.IsValidMissile(missile))
+                    continue;
+
                 EngagedIds[write++] = id;
             }
 
@@ -46,15 +49,55 @@ namespace NOCS.HardKill
             return false;
         }
 
+        internal static bool IsIntercepted(PersistentID threatId)
+        {
+            return WasEngaged(threatId);
+        }
+
         internal static void MarkEngaged(PersistentID threatId)
         {
             if (!threatId.IsValid || WasEngaged(threatId))
                 return;
 
             if (_count >= MaxEntries)
-                return;
+            {
+                PruneInvalid();
+                if (_count >= MaxEntries)
+                    return;
+            }
 
             EngagedIds[_count++] = threatId;
+        }
+
+        internal static void MarkIntercepted(PersistentID threatId)
+        {
+            MarkEngaged(threatId);
+        }
+
+        internal static bool TryMarkEngaged(PersistentID threatId)
+        {
+            if (!threatId.IsValid || WasEngaged(threatId))
+                return false;
+
+            MarkEngaged(threatId);
+            return WasEngaged(threatId);
+        }
+
+        internal static void UnmarkEngaged(PersistentID threatId)
+        {
+            if (!threatId.IsValid)
+                return;
+
+            for (int i = 0; i < _count; i++)
+            {
+                if (EngagedIds[i] != threatId)
+                    continue;
+
+                _count--;
+                if (i < _count)
+                    EngagedIds[i] = EngagedIds[_count];
+                return;
+            }
         }
     }
 }

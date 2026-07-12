@@ -25,8 +25,8 @@ namespace NOCS.Config
         internal static ConfigEntry<bool> RenderRadialText { get; private set; } = null!;
         internal static ConfigEntry<float> AseVisualScale { get; private set; } = null!;
 
-        internal static ConfigEntry<float> AbsoluteMaxEngagementRange { get; private set; } = null!;
-        internal static ConfigEntry<float> AbsoluteMinEngagementRange { get; private set; } = null!;
+        internal static ConfigEntry<float> MaxLaunchRangeMeters { get; private set; } = null!;
+        internal static ConfigEntry<float> MinLaunchRangeMeters { get; private set; } = null!;
         internal static ConfigEntry<float> AseMaxRangeFactor { get; private set; } = null!;
         internal static ConfigEntry<float> AsePreviewRangeFactor { get; private set; } = null!;
         internal static ConfigEntry<float> AsePreviewAppearDistanceM { get; private set; } = null!;
@@ -36,16 +36,15 @@ namespace NOCS.Config
         internal static ConfigEntry<float> AseInterceptConfidence { get; private set; } = null!;
         internal static ConfigEntry<float> MinArmDistSlack { get; private set; } = null!;
 
-        internal static ConfigEntry<float> AseGateToleranceAngle { get; private set; } = null!;
+        internal static ConfigEntry<float> ManualLaunchAimTolerance { get; private set; } = null!;
         internal static ConfigEntry<bool> RequireAseScreenShoot { get; private set; } = null!;
         internal static ConfigEntry<float> LaunchCooldown { get; private set; } = null!;
-        internal static ConfigEntry<float> MaxCpaMeters { get; private set; } = null!;
+        internal static ConfigEntry<float> MissDistanceToleranceMeters { get; private set; } = null!;
         internal static ConfigEntry<float> MaxTimingTickDt { get; private set; } = null!;
 
         internal static ConfigEntry<bool> WarningTtiEnabled { get; private set; } = null!;
         internal static ConfigEntry<float> TtiSmoothingFactor { get; private set; } = null!;
         internal static ConfigEntry<float> ClosureMinThreshold { get; private set; } = null!;
-        internal static ConfigEntry<bool> EngageIrThreats { get; private set; } = null!;
 
         internal static void Bind(ConfigFile config)
         {
@@ -67,7 +66,7 @@ namespace NOCS.Config
             HotKeyModifier = config.Bind(hardKill, "HotKeyModifier", KeyCode.RightShift, "Engagement modifier key.");
             HotKey = config.Bind(hardKill, "HotKey", KeyCode.Slash, "Engagement fire key (/ on US layout).");
             WeaponPriority = config.Bind(hardKill, "WeaponPriority", Config.WeaponPriority.IR_First,
-                "IR_First or ARH_First defensive station priority.");
+                "Legacy priority enum (Hard-Kill always expends IR interceptors before radar).");
             WeaponFilterMode = config.Bind(hardKill, "WeaponFilterMode", Config.WeaponFilterMode.AntiMissileOnly,
                 "Station filter mode.");
 
@@ -77,13 +76,17 @@ namespace NOCS.Config
             RenderRadialText = config.Bind(hudVisuals, "RenderRadialText", true,
                 "Show SHOOT / POTENTIAL HIT status cue under the weapon HUD hint (typography from hint, color from notch rectangle).");
             AseVisualScale = config.Bind(hudVisuals, "AseVisualScale", 1f,
-                new ConfigDescription("Legacy visual scale (unused while ring is disabled).", new AcceptableValueRange<float>(0.5f, 2f)));
+                new ConfigDescription("ASE ring visual scale.", new AcceptableValueRange<float>(0.5f, 2f)));
 
             const string envelope = "2. Engagement Envelope";
-            AbsoluteMaxEngagementRange = config.Bind(envelope, "AbsoluteMaxEngagementRange", 15000f,
-                new ConfigDescription("Hard ceiling engagement range in meters. Set near 99999 to effectively disable the limit.", new AcceptableValueRange<float>(1000f, 100000f)));
-            AbsoluteMinEngagementRange = config.Bind(envelope, "AbsoluteMinEngagementRange", 150f,
-                new ConfigDescription("Hard floor / arming dead-zone in meters. Closer threats are blocked.", new AcceptableValueRange<float>(0f, 2000f)));
+            MaxLaunchRangeMeters = config.Bind(envelope, "MaxLaunchRangeMeters", 15000f,
+                new ConfigDescription(
+                    "Absolute maximum range for anti-missile intercept implementation.",
+                    new AcceptableValueRange<float>(1000f, 100000f)));
+            MinLaunchRangeMeters = config.Bind(envelope, "MinLaunchRangeMeters", 150f,
+                new ConfigDescription(
+                    "Absolute minimum range weapon engagement dead-zone.",
+                    new AcceptableValueRange<float>(0f, 2000f)));
             AseMaxRangeFactor = config.Bind(envelope, "AseMaxRangeFactor", 1f,
                 new ConfigDescription("Multiplier for the dynamic maxDynamicRange engage window.", new AcceptableValueRange<float>(0.5f, 1.5f)));
             AsePreviewRangeFactor = config.Bind(envelope, "AsePreviewRangeFactor", 1f,
@@ -102,14 +105,18 @@ namespace NOCS.Config
                 new ConfigDescription("Advanced: arm-distance slack multiplier.", new AcceptableValueRange<float>(0.1f, 5f)));
 
             const string fireControl = "3. Fire Control & Geometry";
-            AseGateToleranceAngle = config.Bind(fireControl, "AseGateToleranceAngle", 0f,
-                new ConfigDescription("Aiming angle tolerance in degrees. 0 = strict ASE ring; 180 = open gate (any direction).", new AcceptableValueRange<float>(0f, 180f)));
+            ManualLaunchAimTolerance = config.Bind(fireControl, "ManualLaunchAimTolerance", 0f,
+                new ConfigDescription(
+                    "Angle tolerance for manual override shooting. 0 for strict ASE inside lock, 180 for immediate omnidirectional fire.",
+                    new AcceptableValueRange<float>(0f, 180f)));
             RequireAseScreenShoot = config.Bind(fireControl, "RequireAseScreenShoot", false,
                 "When true, hotkey salvo requires gun cross inside the on-screen ASE circle (first-person HUD). Default off — salvo uses threat/range gates only (works in third person and when looking away).");
             LaunchCooldown = config.Bind(fireControl, "LaunchCooldown", 0.35f,
-                new ConfigDescription("Delay between salvo launches in seconds (T_salvo_queue).", new AcceptableValueRange<float>(0.05f, 2f)));
-            MaxCpaMeters = config.Bind(fireControl, "MaxCpaMeters", 50f,
-                new ConfigDescription("CPA tolerance in meters. Threats with larger miss distance are filtered out.", new AcceptableValueRange<float>(10f, 200f)));
+                new ConfigDescription("Inter-shot station wait inside a pair (seconds). Pair hardware lock is fixed at 1.8s in code.", new AcceptableValueRange<float>(0.05f, 2f)));
+            MissDistanceToleranceMeters = config.Bind(fireControl, "MissDistanceToleranceMeters", 50f,
+                new ConfigDescription(
+                    "Maximum allowed missile miss distance in meters for it to be considered a threat.",
+                    new AcceptableValueRange<float>(10f, 200f)));
             MaxTimingTickDt = config.Bind(fireControl, "MaxTimingTickDt", 0f,
                 new ConfigDescription("Advanced: optional salvo timing tick cap (0 = off).", new AcceptableValueRange<float>(0f, 1f)));
 
@@ -118,8 +125,6 @@ namespace NOCS.Config
                 new ConfigDescription("TTI low-pass alpha. Lower = smoother; higher = closer to raw physics.", new AcceptableValueRange<float>(0.01f, 1f)));
             ClosureMinThreshold = config.Bind(signal, "ClosureMinThreshold", 0.1f,
                 new ConfigDescription("Minimum closure speed (m/s) used as a floor for TTI and range gates.", new AcceptableValueRange<float>(0.01f, 100f)));
-            EngageIrThreats = config.Bind(signal, "EngageIrThreats", false,
-                "When true, Hard-Kill also tracks and engages IR threats. Default is radar-only (ARH/SARH).");
 
             const string warningTti = "WarningTTI";
             WarningTtiEnabled = config.Bind(warningTti, "Enabled", true, "Append TTI suffix to MWS threat labels.");
@@ -147,8 +152,8 @@ namespace NOCS.Config
                 RenderAseCircle = RenderAseCircle.Value,
                 RenderRadialText = RenderRadialText.Value,
                 AseVisualScale = AseVisualScale.Value,
-                AbsoluteMaxEngagementRange = AbsoluteMaxEngagementRange.Value,
-                AbsoluteMinEngagementRange = AbsoluteMinEngagementRange.Value,
+                MaxLaunchRangeMeters = MaxLaunchRangeMeters.Value,
+                MinLaunchRangeMeters = MinLaunchRangeMeters.Value,
                 AseMaxRangeFactor = AseMaxRangeFactor.Value,
                 AsePreviewRangeFactor = AsePreviewRangeFactor.Value,
                 AsePreviewAppearDistanceM = AsePreviewAppearDistanceM.Value,
@@ -157,15 +162,14 @@ namespace NOCS.Config
                 AseSensitivityBias = AseSensitivityBias.Value,
                 AseInterceptConfidence = AseInterceptConfidence.Value,
                 MinArmDistSlack = MinArmDistSlack.Value,
-                AseGateToleranceAngle = AseGateToleranceAngle.Value,
+                ManualLaunchAimTolerance = ManualLaunchAimTolerance.Value,
                 RequireAseScreenShoot = RequireAseScreenShoot.Value,
                 LaunchCooldown = LaunchCooldown.Value,
-                MaxCpaMeters = MaxCpaMeters.Value,
+                MissDistanceToleranceMeters = MissDistanceToleranceMeters.Value,
                 MaxTimingTickDt = MaxTimingTickDt.Value,
                 WarningTtiEnabled = WarningTtiEnabled.Value,
                 TtiSmoothingFactor = TtiSmoothingFactor.Value,
                 ClosureMinThreshold = ClosureMinThreshold.Value,
-                EngageIrThreats = EngageIrThreats.Value,
             };
         }
 
@@ -186,8 +190,8 @@ namespace NOCS.Config
             RenderAseCircle.SettingChanged += OnAnySettingChanged;
             RenderRadialText.SettingChanged += OnAnySettingChanged;
             AseVisualScale.SettingChanged += OnAnySettingChanged;
-            AbsoluteMaxEngagementRange.SettingChanged += OnAnySettingChanged;
-            AbsoluteMinEngagementRange.SettingChanged += OnAnySettingChanged;
+            MaxLaunchRangeMeters.SettingChanged += OnAnySettingChanged;
+            MinLaunchRangeMeters.SettingChanged += OnAnySettingChanged;
             AseMaxRangeFactor.SettingChanged += OnAnySettingChanged;
             AsePreviewRangeFactor.SettingChanged += OnAnySettingChanged;
             AsePreviewAppearDistanceM.SettingChanged += OnAnySettingChanged;
@@ -196,15 +200,14 @@ namespace NOCS.Config
             AseSensitivityBias.SettingChanged += OnAnySettingChanged;
             AseInterceptConfidence.SettingChanged += OnAnySettingChanged;
             MinArmDistSlack.SettingChanged += OnAnySettingChanged;
-            AseGateToleranceAngle.SettingChanged += OnAnySettingChanged;
+            ManualLaunchAimTolerance.SettingChanged += OnAnySettingChanged;
             RequireAseScreenShoot.SettingChanged += OnAnySettingChanged;
             LaunchCooldown.SettingChanged += OnAnySettingChanged;
-            MaxCpaMeters.SettingChanged += OnAnySettingChanged;
+            MissDistanceToleranceMeters.SettingChanged += OnAnySettingChanged;
             MaxTimingTickDt.SettingChanged += OnAnySettingChanged;
             WarningTtiEnabled.SettingChanged += OnAnySettingChanged;
             TtiSmoothingFactor.SettingChanged += OnAnySettingChanged;
             ClosureMinThreshold.SettingChanged += OnAnySettingChanged;
-            EngageIrThreats.SettingChanged += OnAnySettingChanged;
         }
 
         private static void OnAnySettingChanged(object sender, System.EventArgs e)
@@ -230,8 +233,8 @@ namespace NOCS.Config
         internal bool RenderAseCircle;
         internal bool RenderRadialText;
         internal float AseVisualScale;
-        internal float AbsoluteMaxEngagementRange;
-        internal float AbsoluteMinEngagementRange;
+        internal float MaxLaunchRangeMeters;
+        internal float MinLaunchRangeMeters;
         internal float AseMaxRangeFactor;
         internal float AsePreviewRangeFactor;
         internal float AsePreviewAppearDistanceM;
@@ -240,14 +243,13 @@ namespace NOCS.Config
         internal float AseSensitivityBias;
         internal float AseInterceptConfidence;
         internal float MinArmDistSlack;
-        internal float AseGateToleranceAngle;
+        internal float ManualLaunchAimTolerance;
         internal bool RequireAseScreenShoot;
         internal float LaunchCooldown;
-        internal float MaxCpaMeters;
+        internal float MissDistanceToleranceMeters;
         internal float MaxTimingTickDt;
         internal bool WarningTtiEnabled;
         internal float TtiSmoothingFactor;
         internal float ClosureMinThreshold;
-        internal bool EngageIrThreats;
     }
 }
