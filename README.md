@@ -1,11 +1,10 @@
 # NOCS (NO Countermeasures Supporter)
 
-Developer: **Mursisru**
-
-[Nuclear Option](https://store.steampowered.com/app/2168680/Nuclear_Option/)
-[BepInEx 5](https://docs.bepinex.dev/)
-[Version 0.5.27QV](https://github.com/Mursisru/NOCS/releases)
-[License: MIT](LICENSE)
+[![Nuclear Option](https://img.shields.io/badge/Game-Nuclear%20Option-blue)](https://store.steampowered.com/app/2168680/Nuclear_Option/)
+[![BepInEx 5](https://img.shields.io/badge/Loader-BepInEx%205-orange)](https://docs.bepinex.dev/)
+[![Version](https://img.shields.io/badge/Version-0.5.27QV-green)](https://github.com/Mursisru/NOCS/releases/tag/v0.5.27)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+[![.NET Framework 4.8](https://img.shields.io/badge/.NET%20Framework-4.8-512BD4)](https://dotnet.microsoft.com/download/dotnet-framework/net48)
 
 ---
 
@@ -15,16 +14,10 @@ Developer: **Mursisru**
 > **BepInEx 5 (x64) required** — install [BepInEx](https://docs.bepinex.dev/articles/user_guide/installation/index.html) before this mod.
 
 > [!WARNING]
-> **Hard-Kill APS changes weapon targeting** — pressing the engagement hotkey (or `AutoEngage`) captures your current track list and launches defensive interceptors against queued incoming threats. Targets are restored after the salvo completes.
-
-> [!WARNING]
-> **Hard MP balance (code-fixed, not in CM)** — nose FOV **50°**, **ARH/SARH** inbound threats only, max **2** launches per pair, then **1.8 s** hardware cooldown. One interceptor per live incoming missile until it is destroyed.
+> **Hard-Kill APS changes weapon targeting** — pressing the engagement hotkey (or `AutoEngage`) captures your track list and launches defensive interceptors. Targets are restored after the salvo. Code-fixed MP balance: nose FOV **50°**, **ARH/SARH** inbound only, max **2** launches per pair + **1.8 s** cooldown, one interceptor per live incoming missile.
 
 > [!TIP]
-> **Configuration Manager recommended** — in-game UI for `com.at747.nocs.bepinex.cfg`. If CM does not open after a game update, set `HideManagerGameObject = true` in `BepInEx\config\BepInEx.cfg`. NOCS fallback: **Ctrl+F10** toggles CM via reflection.
-
-> [!TIP]
-> After game updates, delete `BepInEx\cache\harmony_interop_cache.dat` if patches behave oddly.
+> **Configuration Manager recommended** — open in-game with **F1** for `com.at747.nocs.bepinex.cfg`. If CM fails after a game update, set `HideManagerGameObject = true` in `BepInEx\config\BepInEx.cfg`. Delete `BepInEx\cache\harmony_interop_cache.dat` if patches behave oddly.
 
 BepInEx 5 plugin for the flight sim **Nuclear Option** with two independent HUD systems: passive TrueNotch radar-jam width and active Hard-Kill APS with swarm ASE fire-control geometry.
 
@@ -98,7 +91,6 @@ Active while Hard-Kill APS is enabled and threats are present. **US English keyb
 | Keybind               | Default `KeyCode`      | Action                |
 | --------------------- | ---------------------- | --------------------- |
 | **Right Shift** + `/` | `RightShift` + `Slash` | Start / extend Hard-Kill salvo |
-| **Ctrl** + **F10**    | —                      | Toggle Configuration Manager (NOCS fallback if CM hotkey broken) |
 
 
 **Salvo behaviour:** up to **2** interceptors per pair (hard-coded), then **1.8 s** cooldown. Hotkey and `AutoEngage` both require the same **SHOOT** geometry gate as the HUD cue. Previous track list and active station are restored when the session finishes.
@@ -109,7 +101,7 @@ Active while Hard-Kill APS is enabled and threats are present. **US English keyb
 
 ## Configuration (BepInEx Configuration Manager)
 
-All settings are exposed through **BepInEx.Configuration** (`Config.Bind` in `Config/NocsBepInConfig.cs`). Use [Configuration Manager](https://github.com/BepInEx/BepInEx.ConfigurationManager) in-game, or edit:
+All settings are exposed through **BepInEx.Configuration** (`Config.Bind` in `Config/NocsBepInConfig.cs`). Use [Configuration Manager](https://github.com/BepInEx/BepInEx.ConfigurationManager) in-game (**F1**), or edit:
 
 ```text
 BepInEx\config\com.at747.nocs.bepinex.cfg
@@ -234,5 +226,3 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Licence
 
 MIT License (c) CopyRight ©Mursisru (2026) — see [LICENSE](LICENSE).
-
-**Keywords:** Nuclear Option, BepInEx, Hard-Kill APS, anti-missile, TrueNotch, ASE, fire control, MWS, interceptor, salvo, radar jam, HUD mod, QoL
