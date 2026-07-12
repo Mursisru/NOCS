@@ -2,8 +2,8 @@ namespace NOCS
 {
     internal static class AppVersion
     {
-        public const string ReleaseBase = "0.5.27";
+        public const string ReleaseBase = "0.5.28";
         public const string BepInSemVer = ReleaseBase;
-        public const string DisplayVersion = "0.5.27QV";
+        public const string DisplayVersion = "0.5.28QV";
     }
 }

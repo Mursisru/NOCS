@@ -6,6 +6,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+## [0.5.28] — 2026-07-12
+
+### Changed
+
+- README badges (shields.io), consolidated alert blocks, Configuration Manager hotkey documented as **F1**.
+
+### Build
+
+- Display version: `0.5.28QV`
+- BepInPlugin semver: `0.5.28`
+
 ## [0.5.27] — 2026-07-12
 
 ### Fixed
