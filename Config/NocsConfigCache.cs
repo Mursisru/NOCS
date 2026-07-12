@@ -61,9 +61,18 @@ namespace NOCS.Config
             TrueNotchEnabled = s.TrueNotchEnabled;
             TrueNotchSmoothTime = Mathf.Max(0.01f, s.TrueNotchSmoothTime);
             TrueNotchClampWidth = s.TrueNotchClampWidth;
-            TrueNotchMinWidthScale = s.TrueNotchMinWidthScale;
-            TrueNotchMaxWidthScale = s.TrueNotchMaxWidthScale;
-            NotchDopplerBias = s.NotchDopplerBias;
+            float minScale = Mathf.Max(0.1f, s.TrueNotchMinWidthScale);
+            float maxScale = Mathf.Max(0.1f, s.TrueNotchMaxWidthScale);
+            if (minScale > maxScale)
+            {
+                float swap = minScale;
+                minScale = maxScale;
+                maxScale = swap;
+            }
+
+            TrueNotchMinWidthScale = minScale;
+            TrueNotchMaxWidthScale = maxScale;
+            NotchDopplerBias = Mathf.Clamp(s.NotchDopplerBias, -1f, 1f);
 
             HardKillEnabled = s.HardKillEnabled;
             AutoEngage = s.AutoEngage;
@@ -79,7 +88,7 @@ namespace NOCS.Config
             MaxLaunchRangeMeters = Mathf.Clamp(s.MaxLaunchRangeMeters, 1000f, 100000f);
             MinLaunchRangeMeters = Mathf.Clamp(s.MinLaunchRangeMeters, 0f, 2000f);
             AseMaxRangeFactor = Mathf.Clamp(s.AseMaxRangeFactor, 0.5f, 1.5f);
-            AsePreviewRangeFactor = Mathf.Max(0.01f, s.AsePreviewRangeFactor);
+            AsePreviewRangeFactor = Mathf.Clamp(s.AsePreviewRangeFactor, 0.01f, 5f);
             AsePreviewAppearDistanceM = Mathf.Clamp(s.AsePreviewAppearDistanceM, 500f, 50000f);
             DefaultMaxTurnG = Mathf.Max(1f, s.DefaultMaxTurnG);
             MaxManeuverWindow = Mathf.Max(0.1f, s.MaxManeuverWindow);
@@ -91,7 +100,7 @@ namespace NOCS.Config
             RequireAseScreenShoot = s.RequireAseScreenShoot;
             LaunchCooldown = Mathf.Clamp(s.LaunchCooldown, 0.05f, 2f);
             MissDistanceToleranceMeters = Mathf.Clamp(s.MissDistanceToleranceMeters, 10f, 200f);
-            MaxTimingTickDt = s.MaxTimingTickDt;
+            MaxTimingTickDt = Mathf.Clamp(s.MaxTimingTickDt, 0f, 1f);
 
             WarningTtiEnabled = s.WarningTtiEnabled;
             TtiSmoothingFactor = Mathf.Clamp(s.TtiSmoothingFactor, 0.01f, 1f);

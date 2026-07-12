@@ -13,6 +13,8 @@ namespace NOCS.TrueNotch
         private static int _smoothRectId = -1;
         private static float _smoothWidth = -1f;
         private static float _smoothVel;
+        private static int _lastApplyFrame = -1;
+        private static PersistentID _lastApplyMissileId;
 
         internal static void ApplyLive(
             Aircraft aircraft,
@@ -28,6 +30,11 @@ namespace NOCS.TrueNotch
                 return;
 
             if (!NocsGuard.IsLocalPlayerAircraft(aircraft) || !NocsGuard.IsValidMissile(missile))
+                return;
+
+            int frame = Time.frameCount;
+            PersistentID missileId = missile.persistentID;
+            if (frame == _lastApplyFrame && missileId == _lastApplyMissileId)
                 return;
 
             RectTransform? rect = notchBox.rectTransform;
@@ -46,6 +53,8 @@ namespace NOCS.TrueNotch
             if (!NotchOverlayBinder.TryBind(notchBox, out RectTransform boundRect, out _))
                 return;
 
+            _lastApplyFrame = frame;
+            _lastApplyMissileId = missileId;
             ApplySampleWidth(boundRect, sample.LocalWidth, dt);
         }
 
@@ -54,8 +63,9 @@ namespace NOCS.TrueNotch
             if (!NocsConfigCache.TrueNotchEnabled || !GameManager.flightControlsEnabled)
                 return;
 
-            CombatHUD? combatHud = SceneSingleton<CombatHUD>.i;
-            Aircraft? aircraft = combatHud?.aircraft;
+            if (!GameManager.GetLocalAircraft(out Aircraft aircraft) || aircraft == null)
+                return;
+
             if (!NocsGuard.IsLocalPlayerAircraft(aircraft))
                 return;
 
@@ -66,7 +76,7 @@ namespace NOCS.TrueNotch
             if (!NocsGuard.IsValidMissile(missile))
                 return;
 
-            ApplyLive(aircraft!, missile!, notchBox, telemetry.EvasionVector, dt);
+            ApplyLive(aircraft, missile!, notchBox, telemetry.EvasionVector, dt);
         }
 
         private static void ApplySampleWidth(RectTransform rect, float targetWidth, float dt)

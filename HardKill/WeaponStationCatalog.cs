@@ -31,7 +31,7 @@ namespace NOCS.HardKill
         internal static IReadOnlyList<WeaponStationEntry> Build(Aircraft aircraft)
         {
             int frame = Time.frameCount;
-            if (ReferenceEquals(_cachedAircraft, aircraft) && _cachedFrame == frame && Scratch.Count > 0)
+            if (ReferenceEquals(_cachedAircraft, aircraft) && _cachedFrame == frame)
                 return Scratch;
 
             _cachedAircraft = aircraft;
@@ -151,6 +151,7 @@ namespace NOCS.HardKill
             _cachedEligibleAmmo = -1;
             Scratch.Clear();
             MwsThreatFilter.InvalidateFrameCache();
+            CombatHudMarkerPlacement.InvalidateFrameCache();
         }
 
         internal static bool IsEligibleStation(WeaponStation? station, Aircraft aircraft)

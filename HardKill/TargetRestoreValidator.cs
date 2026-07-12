@@ -37,7 +37,7 @@ namespace NOCS.HardKill
 
                 if (!accurate || !los)
                 {
-                    hq?.CmdUpdateTrackingInfo(id);
+                    TrackingCmdDebounce.TrySend(aircraft, id);
                     continue;
                 }
 

@@ -46,6 +46,9 @@ namespace NOCS.HardKill
             if (dist < MinCommittedLaunchDistM)
                 return false;
 
+            if (dist < NocsConfigCache.MinLaunchRangeMeters)
+                return false;
+
             if (defensiveStation != null && !InterceptGeometry.IsInEnvelope(dist, defensiveStation))
                 return false;
 

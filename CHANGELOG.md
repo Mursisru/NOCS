@@ -6,6 +6,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+## [0.5.27] — 2026-07-12
+
+### Fixed
+
+- **Session stall after failed `LaunchMount`** — ammo/callback verification + 2 s `PendingOwnLaunches` watchdog; rollback on silent launch failure.
+- **Local-player fail-closed** — `NocsGuard` no longer falls back to `CombatHUD.aircraft` (spectator/observed craft).
+- **Aircraft rebind** — hardware pair lock cleared on `ResetSession`; ledger reset retained.
+- **`MinLaunchRangeMeters` / `AutoEngage`** — wired into collect + soft launch / auto SHOOT path (were dead config keys).
+- **Harmony isolation** — `[HarmonyFinalizer]` on FlightHud / CombatHUD / ThreatItem patches.
+
+### Changed
+
+- `CmdUpdateTrackingInfo` debounced per threat ID per frame.
+- Config cache clamps completed (`MaxTimingTickDt`, notch scales, Doppler bias, preview range factor).
+
+### Performance
+
+- Frame-cached hardware salvo lock, turn-G, empty weapon catalog, marker screen centers; Preview/Engage cache keys include defensive station; TrueNotch `ApplyLive` frame-deduped.
+
+### Build
+
+- Display version: `0.5.27QV`
+- BepInPlugin semver: `0.5.27`
+
 ## [0.5.26] — 2026-07-12
 
 ### Fixed

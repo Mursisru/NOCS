@@ -1,6 +1,8 @@
+using System;
 using HarmonyLib;
 using NOCS.Core;
 using NOCS.HardKill;
+using NOCS.Util;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -20,9 +22,10 @@ namespace NOCS.TrueNotch.Patches
                 return;
 
             Missile threat = missile!;
-            CombatHUD? combatHud = SceneSingleton<CombatHUD>.i;
-            Aircraft? aircraft = combatHud?.aircraft;
-            if (!NocsGuard.IsLocalPlayerAircraft(aircraft) || aircraft!.rb == null)
+            if (!GameManager.GetLocalAircraft(out Aircraft aircraft) || aircraft == null)
+                return;
+
+            if (!NocsGuard.IsLocalPlayerAircraft(aircraft) || aircraft.rb == null)
                 return;
 
             WarningTtiLabel.Apply(__instance, threat, aircraft);
@@ -42,7 +45,16 @@ namespace NOCS.TrueNotch.Patches
                 MissileId = threat.persistentID,
             }, notchBox);
 
+            // Frame-deduped ApplyLive (also reachable via RunTick telemetry).
             TrueNotchHudDriver.ApplyLive(aircraft, threat, notchBox, evasionVector, Time.deltaTime);
+        }
+
+        [HarmonyFinalizer]
+        private static Exception? Finalizer(Exception? __exception)
+        {
+            if (__exception != null)
+                NocsDiagLog.ExceptionOnce("ThreatItem.AnimateItem", __exception);
+            return null;
         }
     }
 }

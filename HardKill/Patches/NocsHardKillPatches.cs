@@ -1,6 +1,7 @@
+using System;
 using HarmonyLib;
 using NOCS.Core;
-using NOCS.HardKill;
+using NOCS.Util;
 
 namespace NOCS.HardKill.Patches
 {
@@ -15,6 +16,14 @@ namespace NOCS.HardKill.Patches
 
             NocsHudBootstrap.EnsureAttached();
             NocsAircraftBinder.HandleSetAircraft(aircraft);
+        }
+
+        [HarmonyFinalizer]
+        private static Exception? Finalizer(Exception? __exception)
+        {
+            if (__exception != null)
+                NocsDiagLog.ExceptionOnce("CombatHUD.SetAircraft", __exception);
+            return null;
         }
     }
 }

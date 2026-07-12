@@ -1,8 +1,10 @@
 # NOCS (NO Countermeasures Supporter)
 
+Developer: **Mursisru**
+
 [Nuclear Option](https://store.steampowered.com/app/2168680/Nuclear_Option/)
 [BepInEx 5](https://docs.bepinex.dev/)
-[Version](https://github.com/Mursisru/NOCS)
+[Version 0.5.27QV](https://github.com/Mursisru/NOCS/releases)
 [License: MIT](LICENSE)
 
 ---
@@ -13,14 +15,20 @@
 > **BepInEx 5 (x64) required** — install [BepInEx](https://docs.bepinex.dev/articles/user_guide/installation/index.html) before this mod.
 
 > [!WARNING]
-> **Hard-Kill APS changes weapon targeting** — pressing the engagement hotkey captures your current track list and launches one defensive missile per incoming threat. Targets are restored after the salvo completes.
+> **Hard-Kill APS changes weapon targeting** — pressing the engagement hotkey (or `AutoEngage`) captures your current track list and launches defensive interceptors against queued incoming threats. Targets are restored after the salvo completes.
+
+> [!WARNING]
+> **Hard MP balance (code-fixed, not in CM)** — nose FOV **50°**, **ARH/SARH** inbound threats only, max **2** launches per pair, then **1.8 s** hardware cooldown. One interceptor per live incoming missile until it is destroyed.
 
 > [!TIP]
-> **Configuration Manager recommended** — in-game UI for `com.at747.nocs.bepinex.cfg`. After game updates, delete `BepInEx\cache\harmony_interop_cache.dat` if patches behave oddly.
+> **Configuration Manager recommended** — in-game UI for `com.at747.nocs.bepinex.cfg`. If CM does not open after a game update, set `HideManagerGameObject = true` in `BepInEx\config\BepInEx.cfg`. NOCS fallback: **Ctrl+F10** toggles CM via reflection.
 
-BepInEx 5 plugin for the flight sim **Nuclear Option** with two independent HUD systems: passive TrueNotch radar-jam width and active Hard-Kill APS with a single swarm ASE intercept circle.
+> [!TIP]
+> After game updates, delete `BepInEx\cache\harmony_interop_cache.dat` if patches behave oddly.
 
-**Plugin GUID:** `com.at747.nocs.bepinex`
+BepInEx 5 plugin for the flight sim **Nuclear Option** with two independent HUD systems: passive TrueNotch radar-jam width and active Hard-Kill APS with swarm ASE fire-control geometry.
+
+**Plugin GUID:** `com.at747.nocs.bepinex` · **Display version:** `0.5.27QV` · **BepInPlugin semver:** `0.5.27`
 
 ---
 
@@ -45,9 +53,12 @@ BepInEx 5 plugin for the flight sim **Nuclear Option** with two independent HUD 
 ## Features
 
 - **TrueNotch HUD (passive):** Resizes the radar notch indicator width from real `RadarParams.GetSignalStrength` jam boundaries. Notch center and rotation remain vanilla.
-- **Hard-Kill APS (active):** One **swarm ASE intercept circle** for all incoming guided threats — center is not pinned to a single missile marker; radius expands to encompass every threat envelope. `SHOOT` / `POSSIBLE HIT` cues require the velocity vector inside **all** per-threat guarantee zones.
+- **Hard-Kill APS (active):** Swarm ASE intercept geometry for all incoming radar-guided threats in the nose FOV. Optional intercept ring (`ShowAseInterceptRing`) and status cue under the weapon HUD hint (`RenderRadialText`).
+- **SHOOT / POTENTIAL HIT cues:** Shared fire-control math for HUD and hotkey — not tied to whether the ring or cue is rendered.
+  - **SHOOT** — velocity vector (gun cross) inside **all** per-threat guarantee envelopes, weapon reach OK, at least one unengaged salvo target.
+  - **POTENTIAL HIT** — threat visible in ASE preview, but shoot window not open yet (aim outside envelopes, out of range, or target already engaged).
 - **Warning TTI (MWS labels):** Smoothed time-to-impact suffix on threat list rows (e.g. `Missile [ARH] 4.2 km [8.6s]`), with `[IMPACT]` at zero.
-- **Salvo engine:** Launch budget capped by total pylon ammo; iterates all ready stations; restores the previous track list after the salvo.
+- **Salvo engine:** IR interceptors expended before radar stations; launch budget capped by ammo and pair window; track list restored after session; engagement ledger prevents duplicate shots at the same live threat.
 
 ---
 
@@ -86,10 +97,11 @@ Active while Hard-Kill APS is enabled and threats are present. **US English keyb
 
 | Keybind               | Default `KeyCode`      | Action                |
 | --------------------- | ---------------------- | --------------------- |
-| **Right Shift** + `/` | `RightShift` + `Slash` | Start Hard-Kill salvo |
+| **Right Shift** + `/` | `RightShift` + `Slash` | Start / extend Hard-Kill salvo |
+| **Ctrl** + **F10**    | —                      | Toggle Configuration Manager (NOCS fallback if CM hotkey broken) |
 
 
-**Salvo behaviour:** one outgoing defensive missile per queued incoming threat, capped by available pylon ammo. Previous track list and active station are restored when the salvo completes.
+**Salvo behaviour:** up to **2** interceptors per pair (hard-coded), then **1.8 s** cooldown. Hotkey and `AutoEngage` both require the same **SHOOT** geometry gate as the HUD cue. Previous track list and active station are restored when the session finishes.
 
 ---
 
@@ -102,6 +114,8 @@ All settings are exposed through **BepInEx.Configuration** (`Config.Bind` in `Co
 ```text
 BepInEx\config\com.at747.nocs.bepinex.cfg
 ```
+
+CM groups: **TrueNotchHUD**, **HardKillAPS**, **1. HUD Visuals**, **2. Engagement Envelope**, **3. Fire Control & Geometry**, **4. Signal & Tracking**, **WarningTTI**.
 
 
 
@@ -123,24 +137,54 @@ BepInEx\config\com.at747.nocs.bepinex.cfg
 ### HardKillAPS
 
 
-| Key                      | Default           | Description                                                     |
-| ------------------------ | ----------------- | --------------------------------------------------------------- |
-| `Enabled`                | `true`            | Master switch for Hard-Kill APS                                 |
-| `AseCircleEnabled`       | `true`            | Show the swarm ASE intercept circle and cue labels              |
-| `AutoEngage`             | `false`           | Automatic salvo without hotkey                                  |
-| `HotKeyModifier`         | `RightShift`      | Engagement modifier key                                         |
-| `HotKey`                 | `Slash`           | Engagement fire key                                             |
-| `WeaponPriority`         | `IR_First`        | `IR_First` or `ARH_First`                                       |
-| `WeaponFilterMode`       | `AntiMissileOnly` | Station filter mode                                             |
-| `SafetyDistanceGate`     | `true`            | Require velocity vector inside all threat envelopes for `SHOOT` |
-| `LaunchCooldown`         | `0.05`            | Minimum delay between salvo launches (seconds)                  |
-| `MaxCpaMeters`           | `50.0`            | Max CPA distance for threat inclusion                           |
-| `AsePreviewRangeFactor`  | `1.0`             | ASE preview range multiplier                                    |
-| `AseMaxRangeFactor`      | `1.0`             | Engage window range multiplier                                  |
-| `MaxManeuverWindow`      | `4.5`             | Max maneuver time for envelope (seconds)                        |
-| `AseInterceptConfidence` | `0.99`            | Intercept confidence target (0.5–0.999)                         |
-| `AseSensitivityBias`     | `1.0`             | Global radius multiplier                                        |
-| `DefaultMaxTurnG`        | `15.0`            | Fallback g-limit when prefab data missing                       |
+| Key                | Default      | Description |
+| ------------------ | ------------ | ----------- |
+| `Enabled`          | `true`       | Master switch for Hard-Kill APS |
+| `AutoEngage`       | `false`      | Automatic salvo when **SHOOT** window is open (same gate as hotkey) |
+| `HotKeyModifier`   | `RightShift` | Engagement modifier key |
+| `HotKey`           | `Slash`      | Engagement fire key (`/` on US layout) |
+| `WeaponPriority`   | `IR_First`   | Legacy enum — runtime always expends **IR before radar** |
+| `WeaponFilterMode` | `AntiMissileOnly` | Station filter mode |
+
+**1. HUD Visuals**
+
+| Key                    | Default | Description |
+| ---------------------- | ------- | ----------- |
+| `ShowAseInterceptRing` | `false` | Optional ASE ring + arc SHOOT / POTENTIAL HIT labels |
+| `RenderRadialText`     | `true`  | Status cue under weapon HUD hint |
+| `AseVisualScale`       | `1.0`   | Ring visual scale |
+
+**2. Engagement Envelope**
+
+| Key                         | Default   | Description |
+| --------------------------- | --------- | ----------- |
+| `MaxLaunchRangeMeters`      | `15000`   | Absolute max intercept range (m) |
+| `MinLaunchRangeMeters`      | `150`     | Absolute min engagement dead-zone (m) |
+| `AseMaxRangeFactor`         | `1.0`     | Dynamic engage window multiplier |
+| `AsePreviewRangeFactor`     | `1.0`     | ASE preview range multiplier |
+| `AsePreviewAppearDistanceM` | `5000`    | Slant range (m) where ASE preview may first appear |
+| `MaxManeuverWindow`         | `4.5`     | Max maneuver time for envelope (s) |
+| `AseInterceptConfidence`    | `0.99`    | Intercept confidence target |
+| `AseSensitivityBias`        | `1.0`     | Global envelope radius multiplier |
+| `DefaultMaxTurnG`           | `15.0`    | Fallback g-limit when prefab data missing |
+| `MinArmDistSlack`           | `1.0`     | Arm-distance slack multiplier |
+
+**3. Fire Control & Geometry**
+
+| Key                       | Default | Description |
+| ------------------------- | ------- | ----------- |
+| `ManualLaunchAimTolerance`| `0`     | Extra aim tolerance (deg). `0` = strict ASE; `180` = open gate |
+| `RequireAseScreenShoot`   | `false` | When `true`, SHOOT requires on-screen gun cross (no velocity/nose world fallback) |
+| `LaunchCooldown`          | `0.35`  | Inter-shot station wait inside a pair (s). Pair hardware lock fixed at **1.8 s** in code |
+| `MissDistanceToleranceMeters` | `50` | Max CPA (m) for threat inclusion |
+| `MaxTimingTickDt`         | `0`     | Optional salvo timing tick cap (`0` = off) |
+
+**4. Signal & Tracking**
+
+| Key                    | Default | Description |
+| ---------------------- | ------- | ----------- |
+| `ClosureMinThreshold`  | `0.1`   | Minimum closure speed floor (m/s) for TTI and range gates |
+| `TtiSmoothingFactor`   | `0.08`  | TTI low-pass alpha (also under WarningTTI) |
 
 
 
@@ -190,3 +234,5 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Licence
 
 MIT License (c) CopyRight ©Mursisru (2026) — see [LICENSE](LICENSE).
+
+**Keywords:** Nuclear Option, BepInEx, Hard-Kill APS, anti-missile, TrueNotch, ASE, fire control, MWS, interceptor, salvo, radar jam, HUD mod, QoL

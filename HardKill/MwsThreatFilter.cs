@@ -32,8 +32,10 @@ namespace NOCS.HardKill
 
         private static int _cachedPreviewFrame = -1;
         private static Aircraft? _cachedPreviewAircraft;
+        private static WeaponStation? _cachedPreviewStation;
         private static int _cachedEngageFrame = -1;
         private static Aircraft? _cachedEngageAircraft;
+        private static WeaponStation? _cachedEngageStation;
         private static int _cachedSalvoFrame = -1;
         private static Aircraft? _cachedSalvoAircraft;
 
@@ -59,8 +61,10 @@ namespace NOCS.HardKill
         {
             _cachedPreviewFrame = -1;
             _cachedPreviewAircraft = null;
+            _cachedPreviewStation = null;
             _cachedEngageFrame = -1;
             _cachedEngageAircraft = null;
+            _cachedEngageStation = null;
             _cachedSalvoFrame = -1;
             _cachedSalvoAircraft = null;
             _activeWeaponFrame = -1;
@@ -77,11 +81,16 @@ namespace NOCS.HardKill
         internal static IReadOnlyList<Missile> GetPreviewScratch(Aircraft aircraft, WeaponStation? defensiveStation)
         {
             int frame = Time.frameCount;
-            if (ReferenceEquals(_cachedPreviewAircraft, aircraft) && _cachedPreviewFrame == frame)
+            if (ReferenceEquals(_cachedPreviewAircraft, aircraft)
+                && ReferenceEquals(_cachedPreviewStation, defensiveStation)
+                && _cachedPreviewFrame == frame)
+            {
                 return PreviewScratch;
+            }
 
             _cachedPreviewFrame = frame;
             _cachedPreviewAircraft = aircraft;
+            _cachedPreviewStation = defensiveStation;
             Collect(aircraft, PreviewScratch, defensiveStation, MwsCollectMode.Preview);
             return PreviewScratch;
         }
@@ -89,11 +98,16 @@ namespace NOCS.HardKill
         internal static IReadOnlyList<Missile> GetEngageScratch(Aircraft aircraft, WeaponStation? defensiveStation)
         {
             int frame = Time.frameCount;
-            if (ReferenceEquals(_cachedEngageAircraft, aircraft) && _cachedEngageFrame == frame)
+            if (ReferenceEquals(_cachedEngageAircraft, aircraft)
+                && ReferenceEquals(_cachedEngageStation, defensiveStation)
+                && _cachedEngageFrame == frame)
+            {
                 return EngageScratch;
+            }
 
             _cachedEngageFrame = frame;
             _cachedEngageAircraft = aircraft;
+            _cachedEngageStation = defensiveStation;
             Collect(aircraft, EngageScratch, defensiveStation, MwsCollectMode.Engage);
             return EngageScratch;
         }
@@ -145,6 +159,7 @@ namespace NOCS.HardKill
             PersistentID selfId = aircraft.persistentID;
             FactionHQ? playerHq = aircraft.NetworkHQ;
             float maxRange = NocsConfigCache.MaxLaunchRangeMeters;
+            float minRange = NocsConfigCache.MinLaunchRangeMeters;
 
             List<Missile> scan = ScanMissiles;
             for (int i = 0; i < scan.Count; i++)
@@ -167,7 +182,7 @@ namespace NOCS.HardKill
                     continue;
 
                 float dist = (acPos - mPos).magnitude;
-                if (dist < 1f || dist > maxRange)
+                if (dist < minRange || dist > maxRange)
                     continue;
 
                 TryAddUnique(buffer, missile);
@@ -252,7 +267,7 @@ namespace NOCS.HardKill
 
                 Vector3 toAircraft = acPos - mPos;
                 float dist = toAircraft.magnitude;
-                if (dist < 1f)
+                if (dist < NocsConfigCache.MinLaunchRangeMeters)
                     continue;
 
                 if (dist > NocsConfigCache.MaxLaunchRangeMeters)
@@ -359,6 +374,9 @@ namespace NOCS.HardKill
             WeaponStation? defensiveStation)
         {
             if (dist < 1f)
+                return false;
+
+            if (dist < NocsConfigCache.MinLaunchRangeMeters)
                 return false;
 
             if (dist > NocsConfigCache.MaxLaunchRangeMeters)

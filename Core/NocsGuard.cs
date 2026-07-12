@@ -19,11 +19,11 @@ namespace NOCS.Core
             if (!IsValidUnit(aircraft))
                 return false;
 
-            if (GameManager.GetLocalAircraft(out Aircraft local) && local != null)
-                return local == aircraft;
+            // Fail closed: never fall back to CombatHUD.aircraft (spectator / observed craft).
+            if (!GameManager.GetLocalAircraft(out Aircraft local) || local == null)
+                return false;
 
-            CombatHUD? hud = SceneSingleton<CombatHUD>.i;
-            return hud != null && hud.aircraft == aircraft;
+            return local == aircraft;
         }
 
         internal static bool CanMutateLocalWeapons(Aircraft? aircraft)

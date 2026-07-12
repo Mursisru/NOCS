@@ -62,7 +62,8 @@ namespace NOCS.Config
 
             const string hardKill = "HardKillAPS";
             HardKillEnabled = config.Bind(hardKill, "Enabled", true, "Master switch for Hard-Kill APS.");
-            AutoEngage = config.Bind(hardKill, "AutoEngage", false, "Automatic salvo without hotkey.");
+            AutoEngage = config.Bind(hardKill, "AutoEngage", false,
+                "Automatic salvo when SHOOT window is open (same geometry gate as hotkey).");
             HotKeyModifier = config.Bind(hardKill, "HotKeyModifier", KeyCode.RightShift, "Engagement modifier key.");
             HotKey = config.Bind(hardKill, "HotKey", KeyCode.Slash, "Engagement fire key (/ on US layout).");
             WeaponPriority = config.Bind(hardKill, "WeaponPriority", Config.WeaponPriority.IR_First,

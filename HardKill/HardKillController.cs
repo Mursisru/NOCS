@@ -29,8 +29,12 @@ namespace NOCS.HardKill
                 return;
             }
 
-            CombatHUD? combatHud = SceneSingleton<CombatHUD>.i;
-            Aircraft? aircraft = combatHud?.aircraft;
+            if (!GameManager.GetLocalAircraft(out Aircraft aircraft) || aircraft == null)
+            {
+                _aseView?.SetVisible(false);
+                return;
+            }
+
             if (!NocsGuard.IsLocalPlayerAircraft(aircraft))
             {
                 _aseView?.SetVisible(false);
@@ -39,27 +43,45 @@ namespace NOCS.HardKill
 
             ThreatEngagementLedger.PruneInvalid();
             Allocator.IsHardwareSalvoLocked();
+            TickPendingLaunchWatchdog();
 
-            WeaponStation? defensive = ResolveActiveDefensiveStation(aircraft!);
-            SwarmInterceptSample sample = UpdateAsePreview(aircraft!, defensive);
+            WeaponStation? defensive = ResolveActiveDefensiveStation(aircraft);
+            SwarmInterceptSample sample = UpdateAsePreview(aircraft, defensive);
             _lastAseSample = sample;
 
             bool hotkeySalvoThisTick = false;
+            bool locked = Allocator.IsHardwareSalvoLocked();
+            bool shootOpen = HotTriggerGate.IsSalvoTriggerAllowed(in sample, defensive, aircraft);
+
             if (NocsHotKey.WasPressed(NocsConfigCache.HotKeyModifier, NocsConfigCache.HotKey))
             {
                 // Geometry gate always uses the best available defensive station — never the
                 // last-fired mount (short-range IR could falsely fail AllEnvelopesInWeaponRange).
-                if (!Allocator.IsHardwareSalvoLocked()
-                    && HotTriggerGate.IsSalvoTriggerAllowed(in sample, defensive, aircraft!))
+                if (!locked && shootOpen)
                 {
                     if (Session.Active)
-                        Allocator.ExtendEngagement(aircraft!, defensive);
-                    else if (Allocator.PrepareEngagement(aircraft!, defensive))
-                        BeginSession(aircraft!);
+                        Allocator.ExtendEngagement(aircraft, defensive);
+                    else if (Allocator.PrepareEngagement(aircraft, defensive))
+                        BeginSession(aircraft);
 
                     if (Session.Active && !Allocator.IsSalvoComplete)
                     {
-                        Allocator.RunSalvo(aircraft!, 0f, defensive);
+                        Allocator.RunSalvo(aircraft, 0f, defensive);
+                        hotkeySalvoThisTick = true;
+                    }
+                }
+            }
+            else if (NocsConfigCache.AutoEngage
+                && !Session.Active
+                && !locked
+                && shootOpen)
+            {
+                if (Allocator.PrepareEngagement(aircraft, defensive))
+                {
+                    BeginSession(aircraft);
+                    if (Session.Active && !Allocator.IsSalvoComplete)
+                    {
+                        Allocator.RunSalvo(aircraft, 0f, defensive);
                         hotkeySalvoThisTick = true;
                     }
                 }
@@ -72,33 +94,45 @@ namespace NOCS.HardKill
             {
                 // Keep session alive for remaining threats, but never spin fire while locked.
                 if (Allocator.IsSalvoComplete)
-                    Allocator.TryKeepSessionAlive(aircraft!, defensive);
+                    Allocator.TryKeepSessionAlive(aircraft, defensive);
                 return;
             }
 
             if (Allocator.IsSalvoComplete)
             {
-                if (Allocator.TryKeepSessionAlive(aircraft!, defensive))
+                if (Allocator.TryKeepSessionAlive(aircraft, defensive))
                 {
                     if (!hotkeySalvoThisTick
-                        && HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, defensive, aircraft!))
-                        Allocator.RunSalvo(aircraft!, dt, defensive);
+                        && HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, defensive, aircraft))
+                        Allocator.RunSalvo(aircraft, dt, defensive);
                     return;
                 }
 
                 if (Session.PendingOwnLaunches <= 0)
-                    FinishSession(aircraft!);
+                    FinishSession(aircraft);
                 return;
             }
 
             if (!hotkeySalvoThisTick
-                && HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, defensive, aircraft!))
-                Allocator.RunSalvo(aircraft!, dt, defensive);
+                && HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, defensive, aircraft))
+                Allocator.RunSalvo(aircraft, dt, defensive);
         }
+
+        internal static int PendingOwnLaunchesCount => Session.PendingOwnLaunches;
 
         internal static void NotifySalvoLaunchCommitted()
         {
             Session.PendingOwnLaunches++;
+            Session.PendingLaunchStamp = Time.time;
+        }
+
+        internal static void RollbackSalvoLaunchCommitted()
+        {
+            if (Session.PendingOwnLaunches > 0)
+                Session.PendingOwnLaunches--;
+
+            if (Session.PendingOwnLaunches <= 0)
+                Session.PendingLaunchStamp = -1000f;
         }
 
         internal static void HandleOwnMissileRegistered(Missile missile)
@@ -116,6 +150,9 @@ namespace NOCS.HardKill
             if (Session.PendingOwnLaunches > 0)
                 Session.PendingOwnLaunches--;
 
+            if (Session.PendingOwnLaunches <= 0)
+                Session.PendingLaunchStamp = -1000f;
+
             if (Session.PendingOwnLaunches > 0)
                 return;
 
@@ -132,8 +169,9 @@ namespace NOCS.HardKill
         internal static void ResetSession()
         {
             Session.Reset();
-            Allocator.Reset();
+            Allocator.Reset(clearHardwarePairLock: true);
             ThreatEngagementLedger.Reset();
+            TrackingCmdDebounce.Reset();
             WeaponStationCatalog.InvalidateFrameCache();
         }
 
@@ -150,6 +188,18 @@ namespace NOCS.HardKill
 
             _aseCanvas = null;
             AseCircleSprite.Invalidate();
+        }
+
+        private static void TickPendingLaunchWatchdog()
+        {
+            if (Session.PendingOwnLaunches <= 0)
+                return;
+
+            if (Time.time - Session.PendingLaunchStamp < HardKillSession.PendingLaunchTimeoutSec)
+                return;
+
+            Session.PendingOwnLaunches = 0;
+            Session.PendingLaunchStamp = -1000f;
         }
 
         private static void BeginSession(Aircraft aircraft)
@@ -169,6 +219,7 @@ namespace NOCS.HardKill
             Session.Active = true;
             Session.RestorePending = true;
             Session.PendingOwnLaunches = 0;
+            Session.PendingLaunchStamp = -1000f;
         }
 
         private static void FinishSession(Aircraft aircraft)
@@ -177,7 +228,7 @@ namespace NOCS.HardKill
                 TargetRestoreValidator.Restore(aircraft, Session.SavedTargets);
 
             Session.Reset();
-            Allocator.Reset();
+            Allocator.Reset(clearHardwarePairLock: false);
             _aseView?.SetVisible(false);
         }
 

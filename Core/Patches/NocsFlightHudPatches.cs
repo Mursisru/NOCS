@@ -1,5 +1,6 @@
+using System;
 using HarmonyLib;
-using NOCS.Core;
+using NOCS.Util;
 
 namespace NOCS.Core.Patches
 {
@@ -13,6 +14,14 @@ namespace NOCS.Core.Patches
                 return;
 
             NocsHudBootstrap.EnsureAttached();
+        }
+
+        [HarmonyFinalizer]
+        private static Exception? Finalizer(Exception? __exception)
+        {
+            if (__exception != null)
+                NocsDiagLog.ExceptionOnce("FlightHud.Awake", __exception);
+            return null;
         }
     }
 }

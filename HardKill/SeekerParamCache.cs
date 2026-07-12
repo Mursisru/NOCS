@@ -38,6 +38,8 @@ namespace NOCS.HardKill
 
         private static WeaponStation? _msnCacheStation;
         private static MsnParams _msnCache;
+        private static WeaponStation? _turnGCacheStation;
+        private static float _turnGCacheValue = -1f;
 
         internal static MsnParams GetMsnParams(WeaponStation? station)
         {
@@ -56,6 +58,8 @@ namespace NOCS.HardKill
         {
             _msnCacheStation = null;
             _msnCache = default;
+            _turnGCacheStation = null;
+            _turnGCacheValue = -1f;
         }
 
         internal static float GetArmDelay(WeaponStation station)
@@ -95,7 +99,21 @@ namespace NOCS.HardKill
 
         internal static float GetMaxTurnRateG(WeaponStation station)
         {
-            GameObject? prefab = station?.WeaponInfo?.weaponPrefab;
+            if (station == null)
+                return NocsConfigCache.DefaultMaxTurnG;
+
+            if (ReferenceEquals(station, _turnGCacheStation) && _turnGCacheValue > 0f)
+                return _turnGCacheValue;
+
+            float resolved = ResolveMaxTurnRateG(station);
+            _turnGCacheStation = station;
+            _turnGCacheValue = resolved;
+            return resolved;
+        }
+
+        private static float ResolveMaxTurnRateG(WeaponStation station)
+        {
+            GameObject? prefab = station.WeaponInfo?.weaponPrefab;
             if (prefab == null)
                 return NocsConfigCache.DefaultMaxTurnG;
 

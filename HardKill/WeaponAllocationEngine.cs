@@ -25,6 +25,8 @@ namespace NOCS.HardKill
         private int _pairLaunchesUsed;
         private float _lastSalvoTime = -1000f;
         private bool _queueComplete;
+        private int _lockCacheFrame = -1;
+        private bool _lockCacheValue;
 
         internal Missile? PrimaryThreat => _primaryThreat;
 
@@ -81,7 +83,7 @@ namespace NOCS.HardKill
             _salvoGate.MarkIrPending();
         }
 
-        internal void Reset()
+        internal void Reset(bool clearHardwarePairLock = false)
         {
             _threatQueue.Clear();
             _activeStation = null;
@@ -91,8 +93,19 @@ namespace NOCS.HardKill
             _sessionLaunchesUsed = 0;
             _queueComplete = false;
             _salvoGate.Reset();
-            // Hardware pair lock (_pairLaunchesUsed / _lastSalvoTime) survives session reset.
-            RefreshHardwareSalvoLock();
+            _lockCacheFrame = -1;
+
+            if (clearHardwarePairLock)
+            {
+                _pairLaunchesUsed = 0;
+                _lastSalvoTime = -1000f;
+            }
+            else
+            {
+                // Hardware pair lock survives same-aircraft session finish.
+                RefreshHardwareSalvoLock();
+            }
+
             WeaponStationCatalog.InvalidateFrameCache();
         }
 
@@ -245,7 +258,7 @@ namespace NOCS.HardKill
             WeaponManager wm = aircraft.weaponManager;
             wm.ClearTargetList();
             wm.AddTargetList(threat);
-            aircraft.NetworkHQ?.CmdUpdateTrackingInfo(threat.persistentID);
+            TrackingCmdDebounce.TrySend(aircraft, threat.persistentID);
             wm.TargetListChanged();
         }
 
@@ -259,7 +272,6 @@ namespace NOCS.HardKill
             if (!NocsGuard.IsLocalPlayerAircraft(aircraft) || _queueComplete)
                 return false;
 
-            ThreatEngagementLedger.PruneInvalid();
             PruneDeadThreatsFromQueue();
 
             if (RefreshHardwareSalvoLock())
@@ -423,8 +435,20 @@ namespace NOCS.HardKill
         /// <summary>
         /// Returns true while hardware pair lock is active. Clears pair counter after full SalvoCooldownSec
         /// when the pair is exhausted, or when a partial pair has no live engaged targets left.
+        /// Result cached once per frame.
         /// </summary>
         private bool RefreshHardwareSalvoLock()
+        {
+            int frame = Time.frameCount;
+            if (_lockCacheFrame == frame)
+                return _lockCacheValue;
+
+            _lockCacheFrame = frame;
+            _lockCacheValue = EvaluateHardwareSalvoLock();
+            return _lockCacheValue;
+        }
+
+        private bool EvaluateHardwareSalvoLock()
         {
             if (_pairLaunchesUsed == 0)
                 return false;
@@ -456,6 +480,7 @@ namespace NOCS.HardKill
 
             _pairLaunchesUsed++;
             _lastSalvoTime = Time.time;
+            _lockCacheFrame = -1;
         }
 
         private float ResolveInterShotWait(Aircraft aircraft, WeaponStation? defensiveStation)
@@ -808,6 +833,9 @@ namespace NOCS.HardKill
             if (!NocsGuard.IsValidMissile(threat))
                 return false;
 
+            int ammoBefore = station.Ammo;
+            int pendingBefore = HardKillController.PendingOwnLaunchesCount;
+
             wm.SetActiveStation(entry.Index);
             wm.ClearTargetList();
             wm.AddTargetList(threat);
@@ -815,7 +843,7 @@ namespace NOCS.HardKill
             GlobalPosition aim;
             if (entry.IsRadar)
             {
-                aircraft.NetworkHQ?.CmdUpdateTrackingInfo(threat.persistentID);
+                TrackingCmdDebounce.TrySend(aircraft, threat.persistentID);
                 wm.TargetListChanged();
                 aim = threat.GlobalPosition();
             }
@@ -824,8 +852,19 @@ namespace NOCS.HardKill
                 aim = ResolveIrLeadAim(aircraft, threat, station);
             }
 
+            // Reserve before LaunchMount — sync onRegisterMissile may fire inside LaunchMount.
             HardKillController.NotifySalvoLaunchCommitted();
             station.LaunchMount(aircraft, threat, aim);
+
+            bool ammoConsumed = station.Ammo < ammoBefore;
+            bool callbackConsumed = HardKillController.PendingOwnLaunchesCount <= pendingBefore;
+            if (!ammoConsumed && !callbackConsumed)
+            {
+                HardKillController.RollbackSalvoLaunchCommitted();
+                WeaponStationCatalog.InvalidateFrameCache();
+                return false;
+            }
+
             WeaponStationCatalog.InvalidateFrameCache();
             return true;
         }
