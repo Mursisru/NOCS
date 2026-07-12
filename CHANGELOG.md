@@ -6,6 +6,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+## [0.5.26] — 2026-07-12
+
+### Fixed
+
+- **Intermittent no-fire after SHOOT** — fire-control audit:
+  - One shared `IsShootWindowOpen` for HUD cue and salvo trigger (no drift between “shows SHOOT” and “allows hotkey”).
+  - Soft committed launch again (valid threat + station reach only) — removed double ASE / `MinLaunchRange` / arm-dead re-checks that silently skipped Ready stations.
+  - Geometry gate always uses the best defensive station, not the last-fired IR mount.
+  - SHOOT requires at least one unengaged salvo threat (no false cue on already-intercepted missiles).
+  - When gun cross is on-screen but outside envelopes, world-aim cannot override (SHOOT stays honest).
+
+### Build
+
+- Display version: `0.5.26QV`
+- BepInPlugin semver: `0.5.26`
+
+## [0.5.25] — 2026-07-12
+
+### Fixed
+
+- **Early salvo before SHOOT geometry** — hotkey and committed launch now require the same intercept shoot window as the ASE cue (gun cross inside all envelopes, or velocity/nose world-aim fallback). No longer bypasses fire control when `RequireAseScreenShoot` is off. HUD cue visibility remains independent.
+
+### Build
+
+- Display version: `0.5.25QV`
+- BepInPlugin semver: `0.5.25`
+
+## [0.5.24] — 2026-07-12
+
+### Fixed
+
+- **Partial salvo stuck at 1/2** — when only one interceptor was fired and all engaged incoming missiles are gone, the pair counter now resets after the full 1.8 s cooldown (`_lastSalvoTime` stamped on every launch). Full two-round pairs still hard-lock until cooldown expires.
+
+### Build
+
+- Display version: `0.5.24QV`
+- BepInPlugin semver: `0.5.24`
+
 ## [0.5.23] — 2026-07-12
 
 ### Fixed

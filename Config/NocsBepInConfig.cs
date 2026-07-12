@@ -110,7 +110,7 @@ namespace NOCS.Config
                     "Angle tolerance for manual override shooting. 0 for strict ASE inside lock, 180 for immediate omnidirectional fire.",
                     new AcceptableValueRange<float>(0f, 180f)));
             RequireAseScreenShoot = config.Bind(fireControl, "RequireAseScreenShoot", false,
-                "When true, hotkey salvo requires gun cross inside the on-screen ASE circle (first-person HUD). Default off — salvo uses threat/range gates only (works in third person and when looking away).");
+                "When true, SHOOT requires first-person gun cross (no world-aim fallback if HUD velocity vector is missing). Default off — same SHOOT math with world velocity/nose fallback when screen aim is unavailable. HUD cue visibility does not gate fire.");
             LaunchCooldown = config.Bind(fireControl, "LaunchCooldown", 0.35f,
                 new ConfigDescription("Inter-shot station wait inside a pair (seconds). Pair hardware lock is fixed at 1.8s in code.", new AcceptableValueRange<float>(0.05f, 2f)));
             MissDistanceToleranceMeters = config.Bind(fireControl, "MissDistanceToleranceMeters", 50f,

@@ -47,12 +47,10 @@ namespace NOCS.HardKill
             bool hotkeySalvoThisTick = false;
             if (NocsHotKey.WasPressed(NocsConfigCache.HotKeyModifier, NocsConfigCache.HotKey))
             {
-                WeaponStation? triggerStation = Session.Active
-                    ? Allocator.ResolveGateStation(defensive)
-                    : defensive;
-
+                // Geometry gate always uses the best available defensive station — never the
+                // last-fired mount (short-range IR could falsely fail AllEnvelopesInWeaponRange).
                 if (!Allocator.IsHardwareSalvoLocked()
-                    && HotTriggerGate.IsSalvoTriggerAllowed(in sample, triggerStation, aircraft!))
+                    && HotTriggerGate.IsSalvoTriggerAllowed(in sample, defensive, aircraft!))
                 {
                     if (Session.Active)
                         Allocator.ExtendEngagement(aircraft!, defensive);
@@ -61,7 +59,7 @@ namespace NOCS.HardKill
 
                     if (Session.Active && !Allocator.IsSalvoComplete)
                     {
-                        Allocator.RunSalvo(aircraft!, 0f, triggerStation);
+                        Allocator.RunSalvo(aircraft!, 0f, defensive);
                         hotkeySalvoThisTick = true;
                     }
                 }
@@ -82,10 +80,9 @@ namespace NOCS.HardKill
             {
                 if (Allocator.TryKeepSessionAlive(aircraft!, defensive))
                 {
-                    WeaponStation? resumeStation = Allocator.ResolveGateStation(defensive);
                     if (!hotkeySalvoThisTick
-                        && HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, resumeStation, aircraft!))
-                        Allocator.RunSalvo(aircraft!, dt, resumeStation);
+                        && HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, defensive, aircraft!))
+                        Allocator.RunSalvo(aircraft!, dt, defensive);
                     return;
                 }
 
@@ -94,10 +91,9 @@ namespace NOCS.HardKill
                 return;
             }
 
-            WeaponStation? gateStation = Allocator.ResolveGateStation(defensive);
             if (!hotkeySalvoThisTick
-                && HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, gateStation, aircraft!))
-                Allocator.RunSalvo(aircraft!, dt, gateStation);
+                && HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, defensive, aircraft!))
+                Allocator.RunSalvo(aircraft!, dt, defensive);
         }
 
         internal static void NotifySalvoLaunchCommitted()

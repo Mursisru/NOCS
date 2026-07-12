@@ -99,5 +99,23 @@ namespace NOCS.HardKill
                 return;
             }
         }
+
+        internal static bool HasLiveEngagedThreats()
+        {
+            for (int i = 0; i < _count; i++)
+            {
+                PersistentID id = EngagedIds[i];
+                if (!id.IsValid)
+                    continue;
+
+                if (!NocsUnitLookup.TryGetLiveUnit(id, out Unit unit))
+                    continue;
+
+                if (unit is Missile missile && NocsGuard.IsValidMissile(missile))
+                    return true;
+            }
+
+            return false;
+        }
     }
 }

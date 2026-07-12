@@ -421,19 +421,31 @@ namespace NOCS.HardKill
         }
 
         /// <summary>
-        /// Returns true while hardware pair lock is active. Clears pair counter only after full SalvoCooldownSec.
+        /// Returns true while hardware pair lock is active. Clears pair counter after full SalvoCooldownSec
+        /// when the pair is exhausted, or when a partial pair has no live engaged targets left.
         /// </summary>
         private bool RefreshHardwareSalvoLock()
         {
-            if (_pairLaunchesUsed < MaxSimultaneousTargets)
+            if (_pairLaunchesUsed == 0)
                 return false;
 
             float elapsed = Time.time - _lastSalvoTime;
-            if (elapsed < SalvoCooldownSec)
-                return true;
+            if (_pairLaunchesUsed >= MaxSimultaneousTargets)
+            {
+                if (elapsed < SalvoCooldownSec)
+                    return true;
 
-            _pairLaunchesUsed = 0;
-            _salvoGate.MarkIrPending();
+                _pairLaunchesUsed = 0;
+                _salvoGate.MarkIrPending();
+                return false;
+            }
+
+            if (elapsed >= SalvoCooldownSec && !ThreatEngagementLedger.HasLiveEngagedThreats())
+            {
+                _pairLaunchesUsed = 0;
+                _salvoGate.MarkIrPending();
+            }
+
             return false;
         }
 
@@ -443,10 +455,6 @@ namespace NOCS.HardKill
                 return;
 
             _pairLaunchesUsed++;
-            if (_pairLaunchesUsed < MaxSimultaneousTargets)
-                return;
-
-            // Stamp lock start exactly once when the pair is exhausted.
             _lastSalvoTime = Time.time;
         }
 

@@ -45,5 +45,19 @@ namespace NOCS.Util
             float pxPerRad = Screen.height / Mathf.Max(0.01f, vFovRad);
             return radians * pxPerRad;
         }
+
+        internal static float PxToRadians(float pixels)
+        {
+            if (pixels <= 0f)
+                return 0f;
+
+            float vFovRad = 60f * Mathf.Deg2Rad;
+            Camera? cam = SceneSingleton<CameraStateManager>.i?.mainCamera;
+            if (cam != null)
+                vFovRad = cam.fieldOfView * Mathf.Deg2Rad;
+
+            float pxPerRad = Screen.height / Mathf.Max(0.01f, vFovRad);
+            return pixels / pxPerRad;
+        }
     }
 }
