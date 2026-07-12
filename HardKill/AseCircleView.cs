@@ -242,23 +242,42 @@ namespace NOCS.HardKill
                 return;
             }
 
+            if (!IsStatusCueAlive())
+            {
+                SetStatusVisible(false);
+                return;
+            }
+
             if (!TryResolveWeaponHint(out Text? hint) || hint == null)
             {
                 SetStatusVisible(false);
                 return;
             }
 
-            SetStatusCueMode(mode);
-            ApplyHintTypography(hint);
-            ApplyNotchColor(sample.UrgentThreat);
-            if (!TryPlaceStatusUnderHint(hint))
+            try
             {
-                SetStatusVisible(false);
-                return;
-            }
+                SetStatusCueMode(mode);
+                ApplyHintTypography(hint);
+                ApplyNotchColor(sample.UrgentThreat);
+                if (!TryPlaceStatusUnderHint(hint))
+                {
+                    SetStatusVisible(false);
+                    return;
+                }
 
-            _statusRoot.transform.SetAsLastSibling();
-            SetStatusVisible(true);
+                _statusRoot.transform.SetAsLastSibling();
+                SetStatusVisible(true);
+            }
+            catch (System.Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("AseCircleView.ApplyStatusCue", ex);
+                SetStatusVisible(false);
+            }
+        }
+
+        private bool IsStatusCueAlive()
+        {
+            return _statusRoot != null && _statusRect != null && _statusLabel != null;
         }
 
         private void BuildArcLabels()
@@ -381,6 +400,9 @@ namespace NOCS.HardKill
 
         private void SetStatusCueMode(CueMode mode)
         {
+            if (_statusLabel == null)
+                return;
+
             string text = mode == CueMode.Shoot ? TextShoot : TextPotentialHit;
             if (text == _lastStatusText)
                 return;
@@ -425,6 +447,9 @@ namespace NOCS.HardKill
 
         private void ApplyHintTypography(Text hint)
         {
+            if (_statusLabel == null || hint == null)
+                return;
+
             _statusLabel.font = hint.font;
             _statusLabel.fontSize = hint.fontSize;
             _statusLabel.fontStyle = hint.fontStyle;
@@ -442,6 +467,9 @@ namespace NOCS.HardKill
 
         private void ApplyNotchColor(Missile? threat)
         {
+            if (_statusLabel == null)
+                return;
+
             if (AseNotchStyle.TryGetNotchReference(out Image? notch) && notch != null)
                 _statusLabel.color = AseNotchStyle.ResolveLabelColorFromImage(notch);
             else
@@ -450,7 +478,13 @@ namespace NOCS.HardKill
 
         private bool TryPlaceStatusUnderHint(Text hint)
         {
+            if (_statusRect == null || hint == null)
+                return false;
+
             RectTransform hintRt = hint.rectTransform;
+            if (hintRt == null)
+                return false;
+
             if (_statusRect.parent != hintRt)
                 _statusRect.SetParent(hintRt, false);
 

@@ -6,6 +6,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+## [0.5.31] — 2026-07-12
+
+### Removed
+
+- **Angular launch latency** — deferred `LaunchMount` by nose angle fully removed; launches fire immediately again.
+
+### Build
+
+- Display version: `0.5.31QV`
+- BepInPlugin semver: `0.5.31`
+
+## [0.5.30] — 2026-07-12
+
+### Fixed
+
+- **ASE status cue NRE spam** (`Player.log`) — guard destroyed `Text` / `RectTransform` before `color` / parent writes; try/catch fail-closed on cue apply.
+
+### Removed (superseded by 0.5.31)
+
+- ~~Angular launch latency~~ — removed in 0.5.31.
+
+### Build
+
+- Display version: `0.5.30QV`
+- BepInPlugin semver: `0.5.30`
+
 ## [0.5.29] — 2026-07-12
 
 ### Fixed
