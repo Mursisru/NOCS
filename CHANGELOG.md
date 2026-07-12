@@ -6,6 +6,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+## [0.5.6] — 2026-07-12
+
+### Fixed
+
+- **ASE ring late on crossing / Doppler shots** — preview now uses inbound-speed closure estimate (not raw LOS closure only), distance-scaled CPA tolerance, and forced inclusion inside `AsePreviewAppearDistanceM` (default 5 km).
+- **Preview range floor** — ASE preview range is at least `AsePreviewAppearDistanceM` so the ring can appear from 5 km slant range.
+
+### Added
+
+- Config **`AsePreviewAppearDistanceM`** (default `5000`) in Engagement Envelope.
+
+### Build
+
+- Display version: `0.5.6QV`
+- BepInPlugin semver: `0.5.6`
+
+## [0.5.5] — 2026-07-12
+
+### Changed
+
+- **Hard-Kill hot-path performance** — per-frame caches for MWS threat collect (preview/engage), active weapon resolution, and eligible ammo count; salvo queue sync now filters only new threats instead of copying the full scratch list each tick.
+
+### Build
+
+- Display version: `0.5.5P`
+- BepInPlugin semver: `0.5.5`
+
 ## [0.5.4] — 2026-07-12
 
 ### Fixed

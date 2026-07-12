@@ -67,13 +67,12 @@ namespace NOCS.HardKill
             if (dist < 1f)
                 return sample;
 
-            Vector3 relVel = threat.rb.velocity - aircraft.rb.velocity;
             Vector3 los = toAircraft / dist;
-            float closure = ThreatKinematics.ResolveClosure(
+            float closure = ThreatKinematics.ResolvePreviewClosure(
+                threat,
                 threat.rb.velocity,
                 aircraft.rb.velocity,
-                los,
-                previewMode: true);
+                los);
             sample.ClosureMps = closure;
             if (closure <= 0f)
                 return sample;

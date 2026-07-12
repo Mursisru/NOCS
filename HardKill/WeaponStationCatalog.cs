@@ -24,6 +24,10 @@ namespace NOCS.HardKill
         private static Aircraft? _cachedAircraft;
         private static int _cachedFrame = -1;
 
+        private static Aircraft? _cachedEligibleAircraft;
+        private static int _cachedEligibleFrame = -1;
+        private static int _cachedEligibleAmmo = -1;
+
         internal static IReadOnlyList<WeaponStationEntry> Build(Aircraft aircraft)
         {
             int frame = Time.frameCount;
@@ -71,6 +75,23 @@ namespace NOCS.HardKill
         }
 
         internal static int CountEligibleAmmo(Aircraft aircraft)
+        {
+            int frame = Time.frameCount;
+            if (ReferenceEquals(_cachedEligibleAircraft, aircraft)
+                && _cachedEligibleFrame == frame
+                && _cachedEligibleAmmo >= 0)
+            {
+                return _cachedEligibleAmmo;
+            }
+
+            int total = CountEligibleAmmoUncached(aircraft);
+            _cachedEligibleAircraft = aircraft;
+            _cachedEligibleFrame = frame;
+            _cachedEligibleAmmo = total;
+            return total;
+        }
+
+        private static int CountEligibleAmmoUncached(Aircraft aircraft)
         {
             if (!NocsGuard.IsValidUnit(aircraft) || aircraft!.weaponStations == null)
                 return 0;
@@ -125,7 +146,11 @@ namespace NOCS.HardKill
         {
             _cachedFrame = -1;
             _cachedAircraft = null;
+            _cachedEligibleFrame = -1;
+            _cachedEligibleAircraft = null;
+            _cachedEligibleAmmo = -1;
             Scratch.Clear();
+            MwsThreatFilter.InvalidateFrameCache();
         }
 
         internal static bool IsEligibleStation(WeaponStation? station, Aircraft aircraft)

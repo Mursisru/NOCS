@@ -26,6 +26,7 @@ namespace NOCS.Config
         internal static float AbsoluteMinEngagementRange = 150f;
         internal static float AseMaxRangeFactor = 1f;
         internal static float AsePreviewRangeFactor = 1f;
+        internal static float AsePreviewAppearDistanceM = 5000f;
         internal static float DefaultMaxTurnG = 15f;
         internal static float MaxManeuverWindow = 4.5f;
         internal static float AseSensitivityBias = 1f;
@@ -79,6 +80,7 @@ namespace NOCS.Config
             AbsoluteMinEngagementRange = Mathf.Clamp(s.AbsoluteMinEngagementRange, 0f, 2000f);
             AseMaxRangeFactor = Mathf.Clamp(s.AseMaxRangeFactor, 0.5f, 1.5f);
             AsePreviewRangeFactor = Mathf.Max(0.01f, s.AsePreviewRangeFactor);
+            AsePreviewAppearDistanceM = Mathf.Clamp(s.AsePreviewAppearDistanceM, 500f, 50000f);
             DefaultMaxTurnG = Mathf.Max(1f, s.DefaultMaxTurnG);
             MaxManeuverWindow = Mathf.Max(0.1f, s.MaxManeuverWindow);
             AseSensitivityBias = Mathf.Max(0.01f, s.AseSensitivityBias);

@@ -29,6 +29,7 @@ namespace NOCS.Config
         internal static ConfigEntry<float> AbsoluteMinEngagementRange { get; private set; } = null!;
         internal static ConfigEntry<float> AseMaxRangeFactor { get; private set; } = null!;
         internal static ConfigEntry<float> AsePreviewRangeFactor { get; private set; } = null!;
+        internal static ConfigEntry<float> AsePreviewAppearDistanceM { get; private set; } = null!;
         internal static ConfigEntry<float> DefaultMaxTurnG { get; private set; } = null!;
         internal static ConfigEntry<float> MaxManeuverWindow { get; private set; } = null!;
         internal static ConfigEntry<float> AseSensitivityBias { get; private set; } = null!;
@@ -86,6 +87,8 @@ namespace NOCS.Config
                 new ConfigDescription("Multiplier for the dynamic maxDynamicRange engage window.", new AcceptableValueRange<float>(0.5f, 1.5f)));
             AsePreviewRangeFactor = config.Bind(envelope, "AsePreviewRangeFactor", 1f,
                 new ConfigDescription("Advanced: ASE preview range multiplier.", new AcceptableValueRange<float>(0.01f, 5f)));
+            AsePreviewAppearDistanceM = config.Bind(envelope, "AsePreviewAppearDistanceM", 5000f,
+                new ConfigDescription("Slant range (m) at which the ASE ring may first appear. Preview uses relaxed Doppler/CPA gates at and inside this distance.", new AcceptableValueRange<float>(500f, 50000f)));
             DefaultMaxTurnG = config.Bind(envelope, "DefaultMaxTurnG", 15f,
                 new ConfigDescription("Advanced: fallback g-limit when prefab data is missing.", new AcceptableValueRange<float>(1f, 60f)));
             MaxManeuverWindow = config.Bind(envelope, "MaxManeuverWindow", 4.5f,
@@ -145,6 +148,7 @@ namespace NOCS.Config
                 AbsoluteMinEngagementRange = AbsoluteMinEngagementRange.Value,
                 AseMaxRangeFactor = AseMaxRangeFactor.Value,
                 AsePreviewRangeFactor = AsePreviewRangeFactor.Value,
+                AsePreviewAppearDistanceM = AsePreviewAppearDistanceM.Value,
                 DefaultMaxTurnG = DefaultMaxTurnG.Value,
                 MaxManeuverWindow = MaxManeuverWindow.Value,
                 AseSensitivityBias = AseSensitivityBias.Value,
@@ -182,6 +186,7 @@ namespace NOCS.Config
             AbsoluteMinEngagementRange.SettingChanged += OnAnySettingChanged;
             AseMaxRangeFactor.SettingChanged += OnAnySettingChanged;
             AsePreviewRangeFactor.SettingChanged += OnAnySettingChanged;
+            AsePreviewAppearDistanceM.SettingChanged += OnAnySettingChanged;
             DefaultMaxTurnG.SettingChanged += OnAnySettingChanged;
             MaxManeuverWindow.SettingChanged += OnAnySettingChanged;
             AseSensitivityBias.SettingChanged += OnAnySettingChanged;
@@ -224,6 +229,7 @@ namespace NOCS.Config
         internal float AbsoluteMinEngagementRange;
         internal float AseMaxRangeFactor;
         internal float AsePreviewRangeFactor;
+        internal float AsePreviewAppearDistanceM;
         internal float DefaultMaxTurnG;
         internal float MaxManeuverWindow;
         internal float AseSensitivityBias;

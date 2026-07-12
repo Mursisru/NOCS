@@ -121,10 +121,26 @@ namespace NOCS.HardKill
 
         internal void SyncEngageQueue(Aircraft aircraft, WeaponStation? defensiveStation)
         {
+            IReadOnlyList<Missile> scratch = MwsThreatFilter.GetPreviewScratch(aircraft, defensiveStation);
+            if (scratch.Count == 0)
+                return;
+
             _refreshScratch.Clear();
-            IReadOnlyList<Missile> scratch = MwsThreatFilter.GetScratch(aircraft, defensiveStation);
             for (int i = 0; i < scratch.Count; i++)
-                _refreshScratch.Add(scratch[i]);
+            {
+                Missile candidate = scratch[i];
+                if (ContainsThreatInQueue(candidate))
+                    continue;
+
+                if (ThreatEngagementLedger.WasEngaged(candidate.persistentID))
+                    continue;
+
+                if (_threatQueue.Count + _refreshScratch.Count >= MaxQueue)
+                    break;
+
+                _refreshScratch.Add(candidate);
+            }
+
             if (_refreshScratch.Count == 0)
                 return;
 
@@ -133,17 +149,7 @@ namespace NOCS.HardKill
             bool added = false;
             for (int i = 0; i < _refreshScratch.Count; i++)
             {
-                Missile candidate = _refreshScratch[i];
-                if (ContainsThreatInQueue(candidate))
-                    continue;
-
-                if (ThreatEngagementLedger.WasEngaged(candidate.persistentID))
-                    continue;
-
-                if (_threatQueue.Count >= MaxQueue)
-                    break;
-
-                _threatQueue.Add(candidate);
+                _threatQueue.Add(_refreshScratch[i]);
                 added = true;
             }
 
@@ -289,7 +295,7 @@ namespace NOCS.HardKill
         private void PopulateThreatQueue(Aircraft aircraft, WeaponStation? defensiveStation)
         {
             _threatQueue.Clear();
-            IReadOnlyList<Missile> scratch = MwsThreatFilter.GetScratch(aircraft, defensiveStation);
+            IReadOnlyList<Missile> scratch = MwsThreatFilter.GetPreviewScratch(aircraft, defensiveStation);
             for (int i = 0; i < scratch.Count; i++)
                 _threatQueue.Add(scratch[i]);
         }

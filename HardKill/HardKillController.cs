@@ -156,7 +156,7 @@ namespace NOCS.HardKill
                 return default;
             }
 
-            IReadOnlyList<Missile> threats = MwsThreatFilter.GetScratch(aircraft, defensive);
+            IReadOnlyList<Missile> threats = MwsThreatFilter.GetPreviewScratch(aircraft, defensive);
             if (threats.Count == 0)
             {
                 if (!Session.Active)

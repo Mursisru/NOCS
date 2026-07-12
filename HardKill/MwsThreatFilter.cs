@@ -18,13 +18,24 @@ namespace NOCS.HardKill
         private const float MinRelVelSqr = 0.001f;
         private const float MinDefensiveSpeedMps = 50f;
 
-        private static readonly List<Missile> ActiveThreats = new List<Missile>(MaxThreats);
+        private static readonly List<Missile> PreviewScratch = new List<Missile>(MaxThreats);
+        private static readonly List<Missile> EngageScratch = new List<Missile>(MaxThreats);
         private static readonly int[] CandidateIndices = new int[MaxThreats];
         private static readonly float[] CandidateDist = new float[MaxThreats];
         private static readonly float[] CandidateClosure = new float[MaxThreats];
         private static readonly List<Missile> ScanMissiles = new List<Missile>(16);
 
         private static FieldInfo? _unknownMissilesField;
+
+        private static int _cachedPreviewFrame = -1;
+        private static Aircraft? _cachedPreviewAircraft;
+        private static int _cachedEngageFrame = -1;
+        private static Aircraft? _cachedEngageAircraft;
+
+        private static int _activeWeaponFrame = -1;
+        private static Aircraft? _activeWeaponAircraft;
+        private static WeaponStation? _activeWeaponPreferred;
+        private static WeaponStation? _activeWeaponResult;
 
         internal static void Bind(Aircraft aircraft)
         {
@@ -33,13 +44,50 @@ namespace NOCS.HardKill
 
         internal static void Unbind()
         {
-            ActiveThreats.Clear();
+            PreviewScratch.Clear();
+            EngageScratch.Clear();
+            InvalidateFrameCache();
+        }
+
+        internal static void InvalidateFrameCache()
+        {
+            _cachedPreviewFrame = -1;
+            _cachedPreviewAircraft = null;
+            _cachedEngageFrame = -1;
+            _cachedEngageAircraft = null;
+            _activeWeaponFrame = -1;
+            _activeWeaponAircraft = null;
+            _activeWeaponPreferred = null;
+            _activeWeaponResult = null;
         }
 
         internal static IReadOnlyList<Missile> GetScratch(Aircraft aircraft, WeaponStation? defensiveStation)
         {
-            Collect(aircraft, ActiveThreats, defensiveStation, MwsCollectMode.Preview);
-            return ActiveThreats;
+            return GetPreviewScratch(aircraft, defensiveStation);
+        }
+
+        internal static IReadOnlyList<Missile> GetPreviewScratch(Aircraft aircraft, WeaponStation? defensiveStation)
+        {
+            int frame = Time.frameCount;
+            if (ReferenceEquals(_cachedPreviewAircraft, aircraft) && _cachedPreviewFrame == frame)
+                return PreviewScratch;
+
+            _cachedPreviewFrame = frame;
+            _cachedPreviewAircraft = aircraft;
+            Collect(aircraft, PreviewScratch, defensiveStation, MwsCollectMode.Preview);
+            return PreviewScratch;
+        }
+
+        internal static IReadOnlyList<Missile> GetEngageScratch(Aircraft aircraft, WeaponStation? defensiveStation)
+        {
+            int frame = Time.frameCount;
+            if (ReferenceEquals(_cachedEngageAircraft, aircraft) && _cachedEngageFrame == frame)
+                return EngageScratch;
+
+            _cachedEngageFrame = frame;
+            _cachedEngageAircraft = aircraft;
+            Collect(aircraft, EngageScratch, defensiveStation, MwsCollectMode.Engage);
+            return EngageScratch;
         }
 
         internal static int CollectVisual(Aircraft aircraft, List<Missile> buffer, WeaponStation? defensiveStation)
@@ -132,11 +180,13 @@ namespace NOCS.HardKill
                     continue;
 
                 Vector3 los = toAircraft / dist;
-                float closure = ThreatKinematics.ResolveClosure(
-                    missileRb.velocity,
-                    acVel,
-                    los,
-                    previewMode);
+                float closure = previewMode
+                    ? ThreatKinematics.ResolvePreviewClosure(missile, missileRb.velocity, acVel, los)
+                    : ThreatKinematics.ResolveClosure(
+                        missileRb.velocity,
+                        acVel,
+                        los,
+                        previewMode: false);
                 if (closure <= 0f)
                     continue;
 
@@ -266,18 +316,38 @@ namespace NOCS.HardKill
 
         internal static WeaponStation? ResolveActiveWeapon(Aircraft aircraft, WeaponStation? preferred)
         {
+            int frame = Time.frameCount;
+            if (_activeWeaponFrame == frame
+                && ReferenceEquals(_activeWeaponAircraft, aircraft)
+                && _activeWeaponPreferred == preferred)
+            {
+                return _activeWeaponResult;
+            }
+
+            WeaponStation? resolved;
             if (preferred != null && WeaponStationCatalog.IsEligibleStation(preferred, aircraft))
-                return preferred;
+            {
+                resolved = preferred;
+            }
+            else
+            {
+                WeaponStation? selected = aircraft.weaponManager?.currentWeaponStation;
+                if (selected != null && WeaponStationCatalog.IsEligibleStation(selected, aircraft))
+                {
+                    resolved = selected;
+                }
+                else
+                {
+                    IReadOnlyList<WeaponStationEntry> stations = WeaponStationCatalog.Build(aircraft);
+                    resolved = stations.Count > 0 ? stations[0].Station : null;
+                }
+            }
 
-            WeaponStation? selected = aircraft.weaponManager?.currentWeaponStation;
-            if (selected != null && WeaponStationCatalog.IsEligibleStation(selected, aircraft))
-                return selected;
-
-            IReadOnlyList<WeaponStationEntry> stations = WeaponStationCatalog.Build(aircraft);
-            if (stations.Count == 0)
-                return null;
-
-            return stations[0].Station;
+            _activeWeaponFrame = frame;
+            _activeWeaponAircraft = aircraft;
+            _activeWeaponPreferred = preferred;
+            _activeWeaponResult = resolved;
+            return resolved;
         }
 
         private static void BuildScanList(MissileWarning warning, bool includeUnknown)
@@ -328,7 +398,8 @@ namespace NOCS.HardKill
 
         private static bool PassesPreviewRangeGate(float dist, float previewRangeCap)
         {
-            return dist <= previewRangeCap;
+            float cap = Mathf.Max(previewRangeCap, NocsConfigCache.AsePreviewAppearDistanceM);
+            return dist <= cap;
         }
 
         private static bool PassesEngageRangeGate(
