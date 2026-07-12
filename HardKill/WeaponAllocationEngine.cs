@@ -181,6 +181,42 @@ namespace NOCS.HardKill
             RefreshLaunchBudget(aircraft);
             if (_sessionLaunchesUsed < _sessionLaunchBudget && HasUnengagedThreat())
                 _queueComplete = false;
+
+            RefreshCurrentThreatTrack(aircraft);
+        }
+
+        internal void MaintainActiveEngagement(Aircraft aircraft, WeaponStation? defensiveStation)
+        {
+            if (!NocsGuard.IsLocalPlayerAircraft(aircraft))
+                return;
+
+            SyncEngageQueue(aircraft, defensiveStation);
+            RefreshCurrentThreatTrack(aircraft);
+        }
+
+        private void RefreshCurrentThreatTrack(Aircraft aircraft)
+        {
+            if (_threatQueue.Count == 0)
+                return;
+
+            Missile? current = CurrentThreat;
+            if (current == null
+                || !NocsGuard.IsValidMissile(current)
+                || ThreatEngagementLedger.WasEngaged(current.persistentID))
+            {
+                int next = FindNextEngageIndex();
+                if (next >= _threatQueue.Count)
+                    return;
+
+                _queueIndex = next;
+                _primaryThreat = _threatQueue[next];
+                current = _primaryThreat;
+            }
+
+            if (!SelectActiveStation(aircraft))
+                return;
+
+            RepointTargets(aircraft, current);
         }
 
         internal bool TryKeepSessionAlive(Aircraft aircraft, WeaponStation? defensiveStation)
@@ -246,20 +282,36 @@ namespace NOCS.HardKill
             return true;
         }
 
-        internal void RepointTargets(Aircraft aircraft)
+        internal void RepointTargets(Aircraft aircraft, Missile? threat = null)
         {
             if (!NocsGuard.CanMutateLocalWeapons(aircraft))
                 return;
 
-            Missile? threat = CurrentThreat;
+            threat ??= CurrentThreat;
             if (!NocsGuard.IsValidUnit(aircraft) || aircraft!.weaponManager == null || threat == null)
                 return;
 
-            WeaponManager wm = aircraft.weaponManager;
+            if (!_activeStation.HasValue && !SelectActiveStation(aircraft))
+                return;
+
+            if (!_activeStation.HasValue)
+                return;
+
+            EnsureThreatTracked(aircraft, _activeStation.Value, threat);
+        }
+
+        private static bool EnsureThreatTracked(Aircraft aircraft, WeaponStationEntry entry, Missile threat)
+        {
+            WeaponManager? wm = aircraft.weaponManager;
+            if (wm == null || !NocsGuard.IsValidMissile(threat))
+                return false;
+
+            wm.SetActiveStation(entry.Index);
             wm.ClearTargetList();
             wm.AddTargetList(threat);
             TrackingCmdDebounce.TrySend(aircraft, threat.persistentID);
             wm.TargetListChanged();
+            return wm.CheckIsTarget(threat);
         }
 
         internal bool TrySalvoStep(
@@ -351,6 +403,7 @@ namespace NOCS.HardKill
                 }
 
                 SelectActiveStation(aircraft);
+                RepointTargets(aircraft, threat);
 
                 if (!TryLaunchSingle(aircraft, threat))
                 {
@@ -595,7 +648,13 @@ namespace NOCS.HardKill
             _threatQueue.Clear();
             IReadOnlyList<Missile> scratch = MwsThreatFilter.GetSalvoScratch(aircraft);
             for (int i = 0; i < scratch.Count; i++)
-                _threatQueue.Add(scratch[i]);
+            {
+                Missile threat = scratch[i];
+                if (ThreatEngagementLedger.WasEngaged(threat.persistentID))
+                    continue;
+
+                _threatQueue.Add(threat);
+            }
         }
 
         private int FindNextEngageIndex()
@@ -836,21 +895,14 @@ namespace NOCS.HardKill
             int ammoBefore = station.Ammo;
             int pendingBefore = HardKillController.PendingOwnLaunchesCount;
 
-            wm.SetActiveStation(entry.Index);
-            wm.ClearTargetList();
-            wm.AddTargetList(threat);
+            if (!EnsureThreatTracked(aircraft, entry, threat))
+                return false;
 
             GlobalPosition aim;
             if (entry.IsRadar)
-            {
-                TrackingCmdDebounce.TrySend(aircraft, threat.persistentID);
-                wm.TargetListChanged();
                 aim = threat.GlobalPosition();
-            }
             else
-            {
                 aim = ResolveIrLeadAim(aircraft, threat, station);
-            }
 
             // Reserve before LaunchMount — sync onRegisterMissile may fire inside LaunchMount.
             HardKillController.NotifySalvoLaunchCommitted();

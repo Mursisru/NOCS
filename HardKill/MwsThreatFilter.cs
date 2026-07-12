@@ -159,7 +159,6 @@ namespace NOCS.HardKill
             PersistentID selfId = aircraft.persistentID;
             FactionHQ? playerHq = aircraft.NetworkHQ;
             float maxRange = NocsConfigCache.MaxLaunchRangeMeters;
-            float minRange = NocsConfigCache.MinLaunchRangeMeters;
 
             List<Missile> scan = ScanMissiles;
             for (int i = 0; i < scan.Count; i++)
@@ -182,7 +181,7 @@ namespace NOCS.HardKill
                     continue;
 
                 float dist = (acPos - mPos).magnitude;
-                if (dist < minRange || dist > maxRange)
+                if (dist > maxRange)
                     continue;
 
                 TryAddUnique(buffer, missile);
@@ -267,7 +266,7 @@ namespace NOCS.HardKill
 
                 Vector3 toAircraft = acPos - mPos;
                 float dist = toAircraft.magnitude;
-                if (dist < NocsConfigCache.MinLaunchRangeMeters)
+                if (!previewMode && dist < NocsConfigCache.MinLaunchRangeMeters)
                     continue;
 
                 if (dist > NocsConfigCache.MaxLaunchRangeMeters)

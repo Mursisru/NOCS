@@ -6,6 +6,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+## [0.5.34] — 2026-07-12
+
+### Fixed
+
+- **Close-range / swarm targets skipped for track** — salvo collect no longer drops threats inside `MinLaunchRangeMeters` (launch gate unchanged); preview ASE includes close inbound. WM track applied via `RepointTargets` before each launch attempt and each tick while session active (`MaintainActiveEngagement`).
+
+### Build
+
+- Display version: `0.5.34QV`
+- BepInPlugin semver: `0.5.34`
+
+## [0.5.33] — 2026-07-12
+
+### Fixed
+
+- **Track not clearing after launch** — restore pre-salvo target list immediately on `FinishSession` again; removed deferred restore / post-session engaged track hold. Launch-time capture via `EnsureThreatTracked` retained.
+
+### Build
+
+- Display version: `0.5.33QV`
+- BepInPlugin semver: `0.5.33`
+
+## [0.5.32] — 2026-07-12
+
+### Fixed
+
+- **Outgoing launch without incoming track** — `RepointTargets` now selects the APS station (`SetActiveStation`) before `AddTargetList`; shared `EnsureThreatTracked` verifies `CheckIsTarget` before `LaunchMount`. IR salvo path sends HQ tracking like radar. Deferred target restore while live engaged inbound threats remain; WM track maintained until threat dies.
+
+### Build
+
+- Display version: `0.5.32QV`
+- BepInPlugin semver: `0.5.32`
+
 ## [0.5.31] — 2026-07-12
 
 ### Removed

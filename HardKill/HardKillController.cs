@@ -93,6 +93,8 @@ namespace NOCS.HardKill
             if (!Session.Active)
                 return;
 
+            Allocator.MaintainActiveEngagement(aircraft, defensive);
+
             if (Allocator.IsHardwareSalvoLocked())
             {
                 // Keep session alive for remaining threats, but never spin fire while locked.
