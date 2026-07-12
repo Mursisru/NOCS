@@ -6,6 +6,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+## [0.5.29] — 2026-07-12
+
+### Fixed
+
+- **Multiplayer Hard-Kill / TrueNotch dead after spawn** — `NocsGuard` no longer requires `GameManager.GetLocalAircraft` alone; MP spawn race uses `aircraft.Player.IsLocalPlayer` (same as vanilla `CheckIfLocalSim`). Lazy `NocsAircraftBinder.EnsureBound` recovers if `CombatHUD.SetAircraft` ran before `Player.OnStartLocalPlayer`. Weapon mutate still requires `HasAuthority` / `IsServer` (no spectator weapon writes).
+
+### Build
+
+- Display version: `0.5.29QV`
+- BepInPlugin semver: `0.5.29`
+
 ## [0.5.28] — 2026-07-12
 
 ### Changed

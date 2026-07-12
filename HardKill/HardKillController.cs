@@ -41,6 +41,9 @@ namespace NOCS.HardKill
                 return;
             }
 
+            // Recover bind if CombatHUD.SetAircraft raced before GameManager.SetLocalPlayer.
+            NocsAircraftBinder.EnsureBound(aircraft);
+
             ThreatEngagementLedger.PruneInvalid();
             Allocator.IsHardwareSalvoLocked();
             TickPendingLaunchWatchdog();

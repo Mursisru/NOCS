@@ -1,3 +1,4 @@
+using NuclearOption.Networking;
 using UnityEngine;
 
 namespace NOCS.Core
@@ -19,16 +20,24 @@ namespace NOCS.Core
             if (!IsValidUnit(aircraft))
                 return false;
 
-            // Fail closed: never fall back to CombatHUD.aircraft (spectator / observed craft).
-            if (!GameManager.GetLocalAircraft(out Aircraft local) || local == null)
-                return false;
+            // Canonical once GameManager.SetLocalPlayer has run.
+            if (GameManager.GetLocalAircraft(out Aircraft local) && local != null)
+                return local == aircraft;
 
-            return local == aircraft;
+            // MP spawn race: Aircraft.OnStartClient / CombatHUD.SetAircraft can run
+            // before Player.OnStartLocalPlayer sets GameManager._localPlayer.
+            // Match vanilla CheckIfLocalSim — Mirage IsLocalPlayer on the owner.
+            Player? owner = aircraft!.Player;
+            return owner != null && owner.IsLocalPlayer;
         }
 
         internal static bool CanMutateLocalWeapons(Aircraft? aircraft)
         {
-            return IsLocalPlayerAircraft(aircraft);
+            if (!IsLocalPlayerAircraft(aircraft))
+                return false;
+
+            // MountedMissile only sends CmdLaunchMissile with authority (or Rpc on server).
+            return aircraft!.HasAuthority || aircraft.IsServer;
         }
     }
 }

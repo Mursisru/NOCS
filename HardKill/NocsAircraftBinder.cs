@@ -13,6 +13,11 @@ namespace NOCS.HardKill
                 if (_boundAircraft == null)
                     return;
 
+                // Do not tear down on a false-negative race if the currently bound
+                // airframe is still owned by the local Mirage player.
+                if (_boundAircraft.Player != null && _boundAircraft.Player.IsLocalPlayer)
+                    return;
+
                 UnbindMissileHandler();
                 MwsThreatFilter.Unbind();
                 HardKillController.ResetSession();
@@ -27,6 +32,21 @@ namespace NOCS.HardKill
             HardKillController.ResetSession();
             BindMissileHandler(aircraft!);
             MwsThreatFilter.Bind(aircraft!);
+        }
+
+        /// <summary>
+        /// Lazy rebind after GameManager._localPlayer becomes available — compensates for
+        /// a CombatHUD.SetAircraft that was rejected during the MP spawn race.
+        /// </summary>
+        internal static void EnsureBound(Aircraft aircraft)
+        {
+            if (!NocsGuard.IsLocalPlayerAircraft(aircraft))
+                return;
+
+            if (_boundAircraft == aircraft)
+                return;
+
+            HandleSetAircraft(aircraft);
         }
 
         internal static void SafeUnbind()
