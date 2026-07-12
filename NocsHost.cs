@@ -83,6 +83,24 @@ namespace NOCS
             StartupMission(scenePath);
         }
 
+        private void LateUpdate()
+        {
+            if (!_missionReady)
+                return;
+
+            NocsHudBootstrap.EnsureAttached();
+
+            NocsHudRoot? root = NocsHudRoot.Instance;
+            if (root != null)
+            {
+                root.RunTick(Time.deltaTime);
+                return;
+            }
+
+            TrueNotchHudDriver.RunTick(Time.deltaTime);
+            HardKillController.RunTick(Time.deltaTime);
+        }
+
         private void StartupMission(string scenePath)
         {
             NocsConfigCache.RefreshFromBepIn();

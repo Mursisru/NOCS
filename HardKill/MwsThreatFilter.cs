@@ -111,8 +111,8 @@ namespace NOCS.HardKill
                 if (missileRb == null)
                     continue;
 
-                // Rule 0: Guidance Check — intercept radar threats only (ARH / SARH).
-                if (!IsRadarThreatOnSelf(missile, selfId, playerHq))
+                // Rule 0: Guidance Check — radar by default; IR only when EngageIrThreats is on.
+                if (!IsEngageableThreatOnSelf(missile, selfId, playerHq))
                     continue;
 
                 Vector3 mPos = missileRb.position;
@@ -126,6 +126,9 @@ namespace NOCS.HardKill
                 Vector3 toAircraft = acPos - mPos;
                 float dist = toAircraft.magnitude;
                 if (dist < 1f)
+                    continue;
+
+                if (dist > NocsConfigCache.AbsoluteMaxEngagementRange)
                     continue;
 
                 Vector3 los = toAircraft / dist;
@@ -209,7 +212,10 @@ namespace NOCS.HardKill
             if (dist < 1f)
                 return false;
 
-            float effectiveClosure = Mathf.Max(closure, NocsConfigCache.MinClosureMps);
+            if (dist > NocsConfigCache.AbsoluteMaxEngagementRange)
+                return false;
+
+            float effectiveClosure = Mathf.Max(closure, NocsConfigCache.ClosureMinThreshold);
             if (effectiveClosure <= 0f)
                 return false;
 
@@ -338,7 +344,7 @@ namespace NOCS.HardKill
             float speed = Mathf.Max(defensiveSpeed, MinDefensiveSpeedMps);
             float ttiTarget = dist / speed;
             float leadBuffer = tArm * armSlack + tSalvoQueue;
-            float closureRate = Mathf.Max(closure, NocsConfigCache.MinClosureMps);
+            float closureRate = Mathf.Max(closure, NocsConfigCache.ClosureMinThreshold);
             float kinematicRange = (ttiTarget + leadBuffer) * closureRate;
             float maxDynamicRange = Mathf.Min(maxMissileRange, kinematicRange) * rangeFactor;
             if (dist <= maxDynamicRange)
@@ -347,7 +353,7 @@ namespace NOCS.HardKill
             return dist <= maxMissileRange * rangeFactor;
         }
 
-        private static bool IsRadarThreatOnSelf(Missile missile, PersistentID selfId, FactionHQ? playerHq)
+        private static bool IsEngageableThreatOnSelf(Missile missile, PersistentID selfId, FactionHQ? playerHq)
         {
             if (!NocsGuard.IsValidMissile(missile))
                 return false;
@@ -360,6 +366,9 @@ namespace NOCS.HardKill
 
             SeekerKind kind = SeekerParamCache.ResolveSeekerKind(missile);
             if (SeekerParamCache.IsRadarSeeker(kind))
+                return true;
+
+            if (NocsConfigCache.EngageIrThreats && SeekerParamCache.IsIrSeeker(kind))
                 return true;
 
             // Early ARH/SARH may report empty seeker string while already in active lock/search.

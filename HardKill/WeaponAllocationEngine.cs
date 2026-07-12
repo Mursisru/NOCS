@@ -38,6 +38,47 @@ namespace NOCS.HardKill
 
         internal bool QueueComplete => _queueComplete;
 
+        internal bool IsSalvoComplete => _queueComplete;
+
+        internal WeaponStation? ResolveGateStation(WeaponStation? fallback)
+        {
+            if (_activeStation.HasValue)
+                return _activeStation.Value.Station;
+            return fallback;
+        }
+
+        internal void ExtendEngagement(Aircraft aircraft, WeaponStation? defensiveStation)
+        {
+            if (!NocsGuard.IsLocalPlayerAircraft(aircraft))
+                return;
+
+            SyncEngageQueue(aircraft, defensiveStation);
+            if (_threatQueue.Count == 0)
+                return;
+
+            _sessionLaunchBudget = ResolveLaunchBudget(aircraft);
+            if (_sessionLaunchesUsed >= _sessionLaunchBudget && _queueComplete)
+                return;
+
+            if (_queueIndex >= _threatQueue.Count)
+                _queueIndex = FindNextEngageIndex();
+
+            if (_queueIndex < _threatQueue.Count)
+            {
+                _queueComplete = false;
+                _primaryThreat = _threatQueue[_queueIndex];
+                SelectActiveStation(aircraft);
+                RepointTargets(aircraft);
+            }
+            else if (_sessionLaunchesUsed < _sessionLaunchBudget
+                     && WeaponStationCatalog.CountEligibleAmmo(aircraft) > 0)
+            {
+                _queueComplete = false;
+            }
+
+            _salvoGate.MarkIrPending();
+        }
+
         internal void Reset()
         {
             _threatQueue.Clear();
@@ -57,7 +98,7 @@ namespace NOCS.HardKill
                 return false;
 
             Reset();
-            MwsThreatFilter.CollectVisual(aircraft, _threatQueue, defensiveStation);
+            PopulateThreatQueue(aircraft, defensiveStation);
             RemoveAlreadyEngagedThreats();
 
             if (_threatQueue.Count == 0)
@@ -80,16 +121,16 @@ namespace NOCS.HardKill
 
         internal void SyncEngageQueue(Aircraft aircraft, WeaponStation? defensiveStation)
         {
-            if (_queueComplete)
-                return;
-
             _refreshScratch.Clear();
-            MwsThreatFilter.CollectVisual(aircraft, _refreshScratch, defensiveStation);
+            IReadOnlyList<Missile> scratch = MwsThreatFilter.GetScratch(aircraft, defensiveStation);
+            for (int i = 0; i < scratch.Count; i++)
+                _refreshScratch.Add(scratch[i]);
             if (_refreshScratch.Count == 0)
                 return;
 
             SortQueueByImpact(aircraft, _refreshScratch, _impactScratch);
 
+            bool added = false;
             for (int i = 0; i < _refreshScratch.Count; i++)
             {
                 Missile candidate = _refreshScratch[i];
@@ -103,7 +144,14 @@ namespace NOCS.HardKill
                     break;
 
                 _threatQueue.Add(candidate);
+                added = true;
+            }
+
+            if (added)
+            {
                 _sessionLaunchBudget = ResolveLaunchBudget(aircraft);
+                if (_sessionLaunchesUsed < _sessionLaunchBudget)
+                    _queueComplete = false;
             }
         }
 
@@ -144,12 +192,17 @@ namespace NOCS.HardKill
                 return false;
 
             SyncEngageQueue(aircraft, defensiveStation);
+            if (_queueIndex >= _threatQueue.Count)
+                _queueIndex = FindNextEngageIndex();
 
             while (_queueIndex < _threatQueue.Count)
             {
                 Missile? threat = CurrentThreat;
-                if (threat == null)
-                    break;
+                if (threat == null || !NocsGuard.IsValidMissile(threat))
+                {
+                    AdvanceQueue(aircraft);
+                    continue;
+                }
 
                 if (ThreatEngagementLedger.WasEngaged(threat.persistentID))
                 {
@@ -157,30 +210,20 @@ namespace NOCS.HardKill
                     continue;
                 }
 
-                if (MwsThreatFilter.IsInsideArmDeadZone(threat, aircraft, defensiveStation))
-                {
-                    AdvanceQueue(aircraft);
-                    continue;
-                }
-
-                int remainingLaunches = Mathf.Max(1, _sessionLaunchBudget - _sessionLaunchesUsed);
-                if (!HotTriggerGate.IsSalvoLaunchAllowed(
-                        aircraft,
-                        threat,
-                        remainingLaunches,
-                        defensiveStation))
-                {
-                    return false;
-                }
+                SelectActiveStation(aircraft);
 
                 if (!TryLaunchSingle(aircraft, threat))
                 {
-                    if (!WeaponStationCatalog.HasLaunchableStation(aircraft))
+                    if (WeaponStationCatalog.HasLaunchableStation(aircraft))
                     {
-                        _queueComplete = true;
-                        return false;
+                        AdvanceQueue(aircraft);
+                        continue;
                     }
 
+                    if (WeaponStationCatalog.CountEligibleAmmo(aircraft) > 0)
+                        return false;
+
+                    _queueComplete = true;
                     return false;
                 }
 
@@ -193,6 +236,14 @@ namespace NOCS.HardKill
                 AdvanceQueue(aircraft);
                 _salvoGate.BeginWait(Mathf.Max(0.05f, cooldown));
                 return true;
+            }
+
+            SyncEngageQueue(aircraft, defensiveStation);
+            int next = FindNextEngageIndex();
+            if (next < _threatQueue.Count && _sessionLaunchesUsed < _sessionLaunchBudget)
+            {
+                _queueIndex = next;
+                return false;
             }
 
             _queueComplete = true;
@@ -220,17 +271,42 @@ namespace NOCS.HardKill
         {
             _queueIndex++;
 
-            if (_queueIndex >= _threatQueue.Count)
+            if (_queueIndex < _threatQueue.Count)
             {
-                _queueComplete = true;
-                _primaryThreat = null;
-                _activeStation = null;
+                _primaryThreat = _threatQueue[_queueIndex];
+                SelectActiveStation(aircraft);
+                RepointTargets(aircraft);
                 return;
             }
 
-            _primaryThreat = _threatQueue[_queueIndex];
-            SelectActiveStation(aircraft);
-            RepointTargets(aircraft);
+            _primaryThreat = null;
+            _activeStation = null;
+
+            if (_sessionLaunchesUsed >= _sessionLaunchBudget)
+                _queueComplete = true;
+        }
+
+        private void PopulateThreatQueue(Aircraft aircraft, WeaponStation? defensiveStation)
+        {
+            _threatQueue.Clear();
+            IReadOnlyList<Missile> scratch = MwsThreatFilter.GetScratch(aircraft, defensiveStation);
+            for (int i = 0; i < scratch.Count; i++)
+                _threatQueue.Add(scratch[i]);
+        }
+
+        private int FindNextEngageIndex()
+        {
+            for (int i = 0; i < _threatQueue.Count; i++)
+            {
+                Missile threat = _threatQueue[i];
+                if (!NocsGuard.IsValidMissile(threat))
+                    continue;
+
+                if (!ThreatEngagementLedger.WasEngaged(threat.persistentID))
+                    return i;
+            }
+
+            return _threatQueue.Count;
         }
 
         private bool SelectActiveStation(Aircraft aircraft)
@@ -308,6 +384,9 @@ namespace NOCS.HardKill
                 if (station.Ammo <= 0 || !station.Ready())
                     continue;
 
+                if (!HotTriggerGate.IsCommittedSalvoLaunchAllowed(aircraft, threat, entry.Station))
+                    continue;
+
                 if (!TryLaunch(aircraft, entry, threat))
                     continue;
 
@@ -320,7 +399,10 @@ namespace NOCS.HardKill
 
         private int ResolveLaunchBudget(Aircraft aircraft)
         {
-            int ammo = WeaponStationCatalog.CountAvailableAmmo(aircraft);
+            int ammo = WeaponStationCatalog.CountEligibleAmmo(aircraft);
+            if (ammo <= 0)
+                ammo = WeaponStationCatalog.CountAvailableAmmo(aircraft);
+
             if (ammo <= 0 || _threatQueue.Count <= 0)
                 return 0;
 
@@ -415,6 +497,7 @@ namespace NOCS.HardKill
                 aim = ResolveIrLeadAim(aircraft, threat, station);
             }
 
+            HardKillController.NotifySalvoLaunchCommitted();
             station.LaunchMount(aircraft, threat, aim);
             WeaponStationCatalog.InvalidateFrameCache();
             return true;

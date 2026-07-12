@@ -41,26 +41,31 @@ namespace NOCS.HardKill
             WeaponStation? defensive = ResolveActiveDefensiveStation(aircraft!);
             SwarmInterceptSample swarmSample = UpdateAsePreview(aircraft!, defensive);
 
-            if (!Session.Active
-                && NocsHotKey.WasPressed(NocsConfigCache.HotKeyModifier, NocsConfigCache.HotKey)
-                && Allocator.PrepareEngagement(aircraft!, defensive))
+            if (NocsHotKey.WasPressed(NocsConfigCache.HotKeyModifier, NocsConfigCache.HotKey))
             {
-                BeginSession(aircraft!);
+                if (Session.Active)
+                    Allocator.ExtendEngagement(aircraft!, defensive);
+                else if (Allocator.PrepareEngagement(aircraft!, defensive))
+                    BeginSession(aircraft!);
             }
 
             if (!Session.Active)
                 return;
 
-            if (Allocator.QueueComplete)
+            if (Allocator.IsSalvoComplete)
             {
                 if (Session.PendingOwnLaunches <= 0)
                     FinishSession(aircraft!);
                 return;
             }
 
-            int started = Allocator.RunSalvo(aircraft!, dt, defensive);
-            if (started > 0)
-                Session.PendingOwnLaunches += started;
+            WeaponStation? gateStation = Allocator.ResolveGateStation(defensive);
+            Allocator.RunSalvo(aircraft!, dt, gateStation);
+        }
+
+        internal static void NotifySalvoLaunchCommitted()
+        {
+            Session.PendingOwnLaunches++;
         }
 
         internal static void HandleOwnMissileRegistered(Missile missile)
@@ -80,7 +85,7 @@ namespace NOCS.HardKill
             if (Session.PendingOwnLaunches > 0)
                 return;
 
-            if (!Allocator.QueueComplete)
+            if (!Allocator.IsSalvoComplete)
                 return;
 
             Aircraft? owner = missile.owner as Aircraft;
@@ -145,7 +150,7 @@ namespace NOCS.HardKill
             Aircraft aircraft,
             WeaponStation? defensive)
         {
-            if (!NocsConfigCache.AseCircleEnabled)
+            if (!NocsConfigCache.RenderAseCircle)
             {
                 _aseView?.SetVisible(false);
                 return default;

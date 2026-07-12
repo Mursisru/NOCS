@@ -1,3 +1,4 @@
+using NOCS.Config;
 using NOCS.Core;
 using NOCS.Util;
 using TMPro;
@@ -85,10 +86,11 @@ namespace NOCS.HardKill
 
         internal void SetVisible(bool visible)
         {
+            bool showRing = visible && NocsConfigCache.RenderAseCircle;
             if (_image != null)
-                _image.enabled = visible;
+                _image.enabled = showRing;
 
-            if (!visible)
+            if (!showRing)
                 SetLabelsVisible(false);
         }
 
@@ -97,7 +99,10 @@ namespace NOCS.HardKill
             Aircraft aircraft,
             WeaponStation? defensiveStation)
         {
-            if (!sample.Valid || sample.ScreenDiameterPx <= 0f || sample.ThreatCount <= 0)
+            if (!NocsConfigCache.RenderAseCircle
+                || !sample.Valid
+                || sample.ScreenDiameterPx <= 0f
+                || sample.ThreatCount <= 0)
             {
                 SetVisible(false);
                 SetCueMode(CueMode.Hidden);
@@ -107,7 +112,8 @@ namespace NOCS.HardKill
             if (AseNotchStyle.TryGetNotchReference(out Image? notchRef) && notchRef != null)
                 AseNotchStyle.ApplyImageStyle(_image, notchRef);
 
-            float diameter = sample.ScreenDiameterPx;
+            float scale = Mathf.Clamp(NocsConfigCache.AseVisualScale, 0.5f, 2f);
+            float diameter = sample.ScreenDiameterPx * scale;
             float stroke = AseNotchStyle.ResolveStrokePx();
             byte fillAlpha = AseNotchStyle.ResolveRingPixelAlpha();
             int resStamp = AseCircleSprite.SyncResolutionStamp();
@@ -132,8 +138,11 @@ namespace NOCS.HardKill
 
             CueMode mode = ResolveCueMode(in sample, aircraft, defensiveStation);
             SetCueMode(mode);
-            if (mode == CueMode.Hidden)
+            if (mode == CueMode.Hidden || !NocsConfigCache.RenderRadialText)
+            {
+                SetLabelsVisible(false);
                 return;
+            }
 
             float radiusPx = diameter * 0.5f;
             if (!ArcLabelsFit(radiusPx, stroke, _activeGlyphCount))

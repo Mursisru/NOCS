@@ -21,7 +21,7 @@ namespace NOCS.HardKill
                 return relative;
 
             float inbound = Vector3.Dot(missileVel, losToAircraft);
-            return Mathf.Max(inbound, NocsConfigCache.MinClosureMps);
+            return Mathf.Max(inbound, NocsConfigCache.ClosureMinThreshold);
         }
 
         internal static bool TryResolveCpaMeters(

@@ -125,9 +125,18 @@ namespace NOCS.HardKill
 
         internal static bool GunCrossInsideAllEnvelopes(Vector2 screenPoint)
         {
+            return GunCrossInsideAllEnvelopes(screenPoint, 0f);
+        }
+
+        internal static bool GunCrossInsideAllEnvelopes(Vector2 screenPoint, float tolerancePx)
+        {
             if (_envelopeCount <= 0)
                 return false;
 
+            if (float.IsPositiveInfinity(tolerancePx))
+                return true;
+
+            float tol = Mathf.Max(0f, tolerancePx);
             for (int i = 0; i < _envelopeCount; i++)
             {
                 ThreatEnvelope envelope = Envelopes[i];
@@ -136,7 +145,7 @@ namespace NOCS.HardKill
 
                 float dx = screenPoint.x - envelope.ScreenCenter.x;
                 float dy = screenPoint.y - envelope.ScreenCenter.y;
-                float radius = envelope.ScreenRadiusPx;
+                float radius = envelope.ScreenRadiusPx + tol;
                 if (dx * dx + dy * dy > radius * radius)
                     return false;
             }

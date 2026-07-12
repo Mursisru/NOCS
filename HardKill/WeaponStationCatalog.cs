@@ -70,6 +70,44 @@ namespace NOCS.HardKill
             return total;
         }
 
+        internal static int CountEligibleAmmo(Aircraft aircraft)
+        {
+            if (!NocsGuard.IsValidUnit(aircraft) || aircraft!.weaponStations == null)
+                return 0;
+
+            int total = 0;
+            List<WeaponStation> stations = aircraft.weaponStations;
+            for (int i = 0; i < stations.Count; i++)
+            {
+                WeaponStation? station = stations[i];
+                if (station == null || station.WeaponInfo == null)
+                    continue;
+
+                if (!station.WeaponInfo.missile || station.Ammo <= 0)
+                    continue;
+
+                if (station.SafetyIsOn(aircraft))
+                    continue;
+
+                SeekerKind kind = SeekerParamCache.ResolveSeekerKind(station);
+                if (kind == SeekerKind.None || kind == SeekerKind.Other)
+                    continue;
+
+                if (NocsConfigCache.WeaponFilterMode == WeaponFilterMode.AntiMissileOnly
+                    && station.WeaponInfo.effectiveness.antiMissile <= 0f)
+                {
+                    continue;
+                }
+
+                if (!SeekerParamCache.IsIrSeeker(kind) && !SeekerParamCache.IsRadarSeeker(kind))
+                    continue;
+
+                total += station.Ammo;
+            }
+
+            return total;
+        }
+
         internal static bool HasLaunchableStation(Aircraft aircraft)
         {
             IReadOnlyList<WeaponStationEntry> stations = Build(aircraft);

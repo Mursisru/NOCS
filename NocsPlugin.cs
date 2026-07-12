@@ -30,5 +30,10 @@ namespace NOCS
             NocsHost.Ensure(pluginDir, ModLogger);
             ModLogger.LogInfo($"{PluginName} {AppVersion.DisplayVersion} loaded.");
         }
+
+        private void Update()
+        {
+            NocsConfigurationManagerBridge.TryToggleFallbackHotkey();
+        }
     }
 }

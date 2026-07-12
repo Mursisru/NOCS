@@ -15,28 +15,35 @@ namespace NOCS.Config
         internal static ConfigEntry<float> NotchDopplerBias { get; private set; } = null!;
 
         internal static ConfigEntry<bool> HardKillEnabled { get; private set; } = null!;
-        internal static ConfigEntry<bool> AseCircleEnabled { get; private set; } = null!;
         internal static ConfigEntry<bool> AutoEngage { get; private set; } = null!;
         internal static ConfigEntry<KeyCode> HotKeyModifier { get; private set; } = null!;
         internal static ConfigEntry<KeyCode> HotKey { get; private set; } = null!;
         internal static ConfigEntry<WeaponPriority> WeaponPriority { get; private set; } = null!;
         internal static ConfigEntry<WeaponFilterMode> WeaponFilterMode { get; private set; } = null!;
-        internal static ConfigEntry<bool> SafetyDistanceGate { get; private set; } = null!;
-        internal static ConfigEntry<float> AseMetersToRefPx { get; private set; } = null!;
+
+        internal static ConfigEntry<bool> RenderAseCircle { get; private set; } = null!;
+        internal static ConfigEntry<bool> RenderRadialText { get; private set; } = null!;
+        internal static ConfigEntry<float> AseVisualScale { get; private set; } = null!;
+
+        internal static ConfigEntry<float> AbsoluteMaxEngagementRange { get; private set; } = null!;
+        internal static ConfigEntry<float> AbsoluteMinEngagementRange { get; private set; } = null!;
+        internal static ConfigEntry<float> AseMaxRangeFactor { get; private set; } = null!;
+        internal static ConfigEntry<float> AsePreviewRangeFactor { get; private set; } = null!;
         internal static ConfigEntry<float> DefaultMaxTurnG { get; private set; } = null!;
-        internal static ConfigEntry<float> MinClosureMps { get; private set; } = null!;
         internal static ConfigEntry<float> MaxManeuverWindow { get; private set; } = null!;
         internal static ConfigEntry<float> AseSensitivityBias { get; private set; } = null!;
         internal static ConfigEntry<float> AseInterceptConfidence { get; private set; } = null!;
-        internal static ConfigEntry<float> MaxCpaMeters { get; private set; } = null!;
         internal static ConfigEntry<float> MinArmDistSlack { get; private set; } = null!;
-        internal static ConfigEntry<float> MaxTimingTickDt { get; private set; } = null!;
-        internal static ConfigEntry<float> AseMaxRangeFactor { get; private set; } = null!;
-        internal static ConfigEntry<float> AsePreviewRangeFactor { get; private set; } = null!;
+
+        internal static ConfigEntry<float> AseGateToleranceAngle { get; private set; } = null!;
         internal static ConfigEntry<float> LaunchCooldown { get; private set; } = null!;
+        internal static ConfigEntry<float> MaxCpaMeters { get; private set; } = null!;
+        internal static ConfigEntry<float> MaxTimingTickDt { get; private set; } = null!;
 
         internal static ConfigEntry<bool> WarningTtiEnabled { get; private set; } = null!;
         internal static ConfigEntry<float> TtiSmoothingFactor { get; private set; } = null!;
+        internal static ConfigEntry<float> ClosureMinThreshold { get; private set; } = null!;
+        internal static ConfigEntry<bool> EngageIrThreats { get; private set; } = null!;
 
         internal static void Bind(ConfigFile config)
         {
@@ -54,8 +61,6 @@ namespace NOCS.Config
 
             const string hardKill = "HardKillAPS";
             HardKillEnabled = config.Bind(hardKill, "Enabled", true, "Master switch for Hard-Kill APS.");
-            AseCircleEnabled = config.Bind(hardKill, "AseCircleEnabled", true,
-                "Show the swarm ASE intercept circle and cue labels.");
             AutoEngage = config.Bind(hardKill, "AutoEngage", false, "Automatic salvo without hotkey.");
             HotKeyModifier = config.Bind(hardKill, "HotKeyModifier", KeyCode.RightShift, "Engagement modifier key.");
             HotKey = config.Bind(hardKill, "HotKey", KeyCode.Slash, "Engagement fire key (/ on US layout).");
@@ -63,37 +68,55 @@ namespace NOCS.Config
                 "IR_First or ARH_First defensive station priority.");
             WeaponFilterMode = config.Bind(hardKill, "WeaponFilterMode", Config.WeaponFilterMode.AntiMissileOnly,
                 "Station filter mode.");
-            SafetyDistanceGate = config.Bind(hardKill, "SafetyDistanceGate", true,
-                "Require velocity vector inside all threat envelopes for SHOOT.");
-            AseMetersToRefPx = config.Bind(hardKill, "AseMetersToRefPx", 120f,
-                new ConfigDescription("Reference meters-to-pixel scale.", new AcceptableValueRange<float>(10f, 500f)));
-            DefaultMaxTurnG = config.Bind(hardKill, "DefaultMaxTurnG", 15f,
-                new ConfigDescription("Fallback g-limit when prefab data missing.", new AcceptableValueRange<float>(1f, 60f)));
-            MinClosureMps = config.Bind(hardKill, "MinClosureMps", 5f,
-                new ConfigDescription("Minimum closure for threat gates.", new AcceptableValueRange<float>(1f, 100f)));
-            MaxManeuverWindow = config.Bind(hardKill, "MaxManeuverWindow", 4.5f,
-                new ConfigDescription("Max maneuver time for envelope (seconds).", new AcceptableValueRange<float>(0.1f, 20f)));
-            AseSensitivityBias = config.Bind(hardKill, "AseSensitivityBias", 1f,
-                new ConfigDescription("Global radius multiplier.", new AcceptableValueRange<float>(0.01f, 5f)));
-            AseInterceptConfidence = config.Bind(hardKill, "AseInterceptConfidence", 0.99f,
-                new ConfigDescription("Intercept confidence target.", new AcceptableValueRange<float>(0.5f, 0.999f)));
-            MaxCpaMeters = config.Bind(hardKill, "MaxCpaMeters", 50f,
-                new ConfigDescription("Max CPA distance for threat inclusion.", new AcceptableValueRange<float>(1f, 500f)));
-            MinArmDistSlack = config.Bind(hardKill, "MinArmDistSlack", 1f,
-                new ConfigDescription("Arm-distance slack multiplier.", new AcceptableValueRange<float>(0.1f, 5f)));
-            MaxTimingTickDt = config.Bind(hardKill, "MaxTimingTickDt", 0f,
-                new ConfigDescription("Optional salvo timing cap (0 = off).", new AcceptableValueRange<float>(0f, 1f)));
-            AseMaxRangeFactor = config.Bind(hardKill, "AseMaxRangeFactor", 1f,
-                new ConfigDescription("Engage window range multiplier.", new AcceptableValueRange<float>(0.01f, 5f)));
-            AsePreviewRangeFactor = config.Bind(hardKill, "AsePreviewRangeFactor", 1f,
-                new ConfigDescription("ASE preview range multiplier.", new AcceptableValueRange<float>(0.01f, 5f)));
-            LaunchCooldown = config.Bind(hardKill, "LaunchCooldown", 0.05f,
-                new ConfigDescription("Minimum delay between salvo launches (seconds).", new AcceptableValueRange<float>(0f, 5f)));
+
+            const string hudVisuals = "1. HUD Visuals";
+            RenderAseCircle = config.Bind(hudVisuals, "RenderAseCircle", true,
+                "Draw the ASE intercept ring on the HUD. When off, the ring is hidden but launch logic still runs.");
+            RenderRadialText = config.Bind(hudVisuals, "RenderRadialText", true,
+                "Show SHOOT / POSSIBLE HIT radial cue labels around the ASE ring.");
+            AseVisualScale = config.Bind(hudVisuals, "AseVisualScale", 1f,
+                new ConfigDescription("Visual scale multiplier for ASE ring and cue labels.", new AcceptableValueRange<float>(0.5f, 2f)));
+
+            const string envelope = "2. Engagement Envelope";
+            AbsoluteMaxEngagementRange = config.Bind(envelope, "AbsoluteMaxEngagementRange", 15000f,
+                new ConfigDescription("Hard ceiling engagement range in meters. Set near 99999 to effectively disable the limit.", new AcceptableValueRange<float>(1000f, 100000f)));
+            AbsoluteMinEngagementRange = config.Bind(envelope, "AbsoluteMinEngagementRange", 150f,
+                new ConfigDescription("Hard floor / arming dead-zone in meters. Closer threats are blocked.", new AcceptableValueRange<float>(0f, 2000f)));
+            AseMaxRangeFactor = config.Bind(envelope, "AseMaxRangeFactor", 1f,
+                new ConfigDescription("Multiplier for the dynamic maxDynamicRange engage window.", new AcceptableValueRange<float>(0.5f, 1.5f)));
+            AsePreviewRangeFactor = config.Bind(envelope, "AsePreviewRangeFactor", 1f,
+                new ConfigDescription("Advanced: ASE preview range multiplier.", new AcceptableValueRange<float>(0.01f, 5f)));
+            DefaultMaxTurnG = config.Bind(envelope, "DefaultMaxTurnG", 15f,
+                new ConfigDescription("Advanced: fallback g-limit when prefab data is missing.", new AcceptableValueRange<float>(1f, 60f)));
+            MaxManeuverWindow = config.Bind(envelope, "MaxManeuverWindow", 4.5f,
+                new ConfigDescription("Advanced: max maneuver time for envelope (seconds).", new AcceptableValueRange<float>(0.1f, 20f)));
+            AseSensitivityBias = config.Bind(envelope, "AseSensitivityBias", 1f,
+                new ConfigDescription("Advanced: global envelope radius multiplier.", new AcceptableValueRange<float>(0.01f, 5f)));
+            AseInterceptConfidence = config.Bind(envelope, "AseInterceptConfidence", 0.99f,
+                new ConfigDescription("Advanced: intercept confidence target.", new AcceptableValueRange<float>(0.5f, 0.999f)));
+            MinArmDistSlack = config.Bind(envelope, "MinArmDistSlack", 1f,
+                new ConfigDescription("Advanced: arm-distance slack multiplier.", new AcceptableValueRange<float>(0.1f, 5f)));
+
+            const string fireControl = "3. Fire Control & Geometry";
+            AseGateToleranceAngle = config.Bind(fireControl, "AseGateToleranceAngle", 0f,
+                new ConfigDescription("Aiming angle tolerance in degrees. 0 = strict ASE ring; 180 = open gate (any direction).", new AcceptableValueRange<float>(0f, 180f)));
+            LaunchCooldown = config.Bind(fireControl, "LaunchCooldown", 0.35f,
+                new ConfigDescription("Delay between salvo launches in seconds (T_salvo_queue).", new AcceptableValueRange<float>(0.05f, 2f)));
+            MaxCpaMeters = config.Bind(fireControl, "MaxCpaMeters", 50f,
+                new ConfigDescription("CPA tolerance in meters. Threats with larger miss distance are filtered out.", new AcceptableValueRange<float>(10f, 200f)));
+            MaxTimingTickDt = config.Bind(fireControl, "MaxTimingTickDt", 0f,
+                new ConfigDescription("Advanced: optional salvo timing tick cap (0 = off).", new AcceptableValueRange<float>(0f, 1f)));
+
+            const string signal = "4. Signal & Tracking";
+            TtiSmoothingFactor = config.Bind(signal, "TtiSmoothingFactor", 0.08f,
+                new ConfigDescription("TTI low-pass alpha. Lower = smoother; higher = closer to raw physics.", new AcceptableValueRange<float>(0.01f, 1f)));
+            ClosureMinThreshold = config.Bind(signal, "ClosureMinThreshold", 0.1f,
+                new ConfigDescription("Minimum closure speed (m/s) used as a floor for TTI and range gates.", new AcceptableValueRange<float>(0.01f, 100f)));
+            EngageIrThreats = config.Bind(signal, "EngageIrThreats", false,
+                "When true, Hard-Kill also tracks and engages IR threats. Default is radar-only (ARH/SARH).");
 
             const string warningTti = "WarningTTI";
             WarningTtiEnabled = config.Bind(warningTti, "Enabled", true, "Append TTI suffix to MWS threat labels.");
-            TtiSmoothingFactor = config.Bind(warningTti, "TtiSmoothingFactor", 0.08f,
-                new ConfigDescription("Low-pass blend toward raw physics TTI.", new AcceptableValueRange<float>(0.01f, 1f)));
 
             IsBound = true;
             WireSettingChanged();
@@ -110,27 +133,31 @@ namespace NOCS.Config
                 TrueNotchMaxWidthScale = TrueNotchMaxWidthScale.Value,
                 NotchDopplerBias = NotchDopplerBias.Value,
                 HardKillEnabled = HardKillEnabled.Value,
-                AseCircleEnabled = AseCircleEnabled.Value,
                 AutoEngage = AutoEngage.Value,
                 HotKeyModifier = HotKeyModifier.Value,
                 HotKey = HotKey.Value,
                 WeaponPriority = WeaponPriority.Value,
                 WeaponFilterMode = WeaponFilterMode.Value,
-                SafetyDistanceGate = SafetyDistanceGate.Value,
-                AseMetersToRefPx = AseMetersToRefPx.Value,
+                RenderAseCircle = RenderAseCircle.Value,
+                RenderRadialText = RenderRadialText.Value,
+                AseVisualScale = AseVisualScale.Value,
+                AbsoluteMaxEngagementRange = AbsoluteMaxEngagementRange.Value,
+                AbsoluteMinEngagementRange = AbsoluteMinEngagementRange.Value,
+                AseMaxRangeFactor = AseMaxRangeFactor.Value,
+                AsePreviewRangeFactor = AsePreviewRangeFactor.Value,
                 DefaultMaxTurnG = DefaultMaxTurnG.Value,
-                MinClosureMps = MinClosureMps.Value,
                 MaxManeuverWindow = MaxManeuverWindow.Value,
                 AseSensitivityBias = AseSensitivityBias.Value,
                 AseInterceptConfidence = AseInterceptConfidence.Value,
-                MaxCpaMeters = MaxCpaMeters.Value,
                 MinArmDistSlack = MinArmDistSlack.Value,
-                MaxTimingTickDt = MaxTimingTickDt.Value,
-                AseMaxRangeFactor = AseMaxRangeFactor.Value,
-                AsePreviewRangeFactor = AsePreviewRangeFactor.Value,
+                AseGateToleranceAngle = AseGateToleranceAngle.Value,
                 LaunchCooldown = LaunchCooldown.Value,
+                MaxCpaMeters = MaxCpaMeters.Value,
+                MaxTimingTickDt = MaxTimingTickDt.Value,
                 WarningTtiEnabled = WarningTtiEnabled.Value,
                 TtiSmoothingFactor = TtiSmoothingFactor.Value,
+                ClosureMinThreshold = ClosureMinThreshold.Value,
+                EngageIrThreats = EngageIrThreats.Value,
             };
         }
 
@@ -143,27 +170,31 @@ namespace NOCS.Config
             TrueNotchMaxWidthScale.SettingChanged += OnAnySettingChanged;
             NotchDopplerBias.SettingChanged += OnAnySettingChanged;
             HardKillEnabled.SettingChanged += OnAnySettingChanged;
-            AseCircleEnabled.SettingChanged += OnAnySettingChanged;
             AutoEngage.SettingChanged += OnAnySettingChanged;
             HotKeyModifier.SettingChanged += OnAnySettingChanged;
             HotKey.SettingChanged += OnAnySettingChanged;
             WeaponPriority.SettingChanged += OnAnySettingChanged;
             WeaponFilterMode.SettingChanged += OnAnySettingChanged;
-            SafetyDistanceGate.SettingChanged += OnAnySettingChanged;
-            AseMetersToRefPx.SettingChanged += OnAnySettingChanged;
+            RenderAseCircle.SettingChanged += OnAnySettingChanged;
+            RenderRadialText.SettingChanged += OnAnySettingChanged;
+            AseVisualScale.SettingChanged += OnAnySettingChanged;
+            AbsoluteMaxEngagementRange.SettingChanged += OnAnySettingChanged;
+            AbsoluteMinEngagementRange.SettingChanged += OnAnySettingChanged;
+            AseMaxRangeFactor.SettingChanged += OnAnySettingChanged;
+            AsePreviewRangeFactor.SettingChanged += OnAnySettingChanged;
             DefaultMaxTurnG.SettingChanged += OnAnySettingChanged;
-            MinClosureMps.SettingChanged += OnAnySettingChanged;
             MaxManeuverWindow.SettingChanged += OnAnySettingChanged;
             AseSensitivityBias.SettingChanged += OnAnySettingChanged;
             AseInterceptConfidence.SettingChanged += OnAnySettingChanged;
-            MaxCpaMeters.SettingChanged += OnAnySettingChanged;
             MinArmDistSlack.SettingChanged += OnAnySettingChanged;
-            MaxTimingTickDt.SettingChanged += OnAnySettingChanged;
-            AseMaxRangeFactor.SettingChanged += OnAnySettingChanged;
-            AsePreviewRangeFactor.SettingChanged += OnAnySettingChanged;
+            AseGateToleranceAngle.SettingChanged += OnAnySettingChanged;
             LaunchCooldown.SettingChanged += OnAnySettingChanged;
+            MaxCpaMeters.SettingChanged += OnAnySettingChanged;
+            MaxTimingTickDt.SettingChanged += OnAnySettingChanged;
             WarningTtiEnabled.SettingChanged += OnAnySettingChanged;
             TtiSmoothingFactor.SettingChanged += OnAnySettingChanged;
+            ClosureMinThreshold.SettingChanged += OnAnySettingChanged;
+            EngageIrThreats.SettingChanged += OnAnySettingChanged;
         }
 
         private static void OnAnySettingChanged(object sender, System.EventArgs e)
@@ -181,26 +212,30 @@ namespace NOCS.Config
         internal float TrueNotchMaxWidthScale;
         internal float NotchDopplerBias;
         internal bool HardKillEnabled;
-        internal bool AseCircleEnabled;
         internal bool AutoEngage;
         internal KeyCode HotKeyModifier;
         internal KeyCode HotKey;
         internal WeaponPriority WeaponPriority;
         internal WeaponFilterMode WeaponFilterMode;
-        internal bool SafetyDistanceGate;
-        internal float AseMetersToRefPx;
+        internal bool RenderAseCircle;
+        internal bool RenderRadialText;
+        internal float AseVisualScale;
+        internal float AbsoluteMaxEngagementRange;
+        internal float AbsoluteMinEngagementRange;
+        internal float AseMaxRangeFactor;
+        internal float AsePreviewRangeFactor;
         internal float DefaultMaxTurnG;
-        internal float MinClosureMps;
         internal float MaxManeuverWindow;
         internal float AseSensitivityBias;
         internal float AseInterceptConfidence;
-        internal float MaxCpaMeters;
         internal float MinArmDistSlack;
-        internal float MaxTimingTickDt;
-        internal float AseMaxRangeFactor;
-        internal float AsePreviewRangeFactor;
+        internal float AseGateToleranceAngle;
         internal float LaunchCooldown;
+        internal float MaxCpaMeters;
+        internal float MaxTimingTickDt;
         internal bool WarningTtiEnabled;
         internal float TtiSmoothingFactor;
+        internal float ClosureMinThreshold;
+        internal bool EngageIrThreats;
     }
 }

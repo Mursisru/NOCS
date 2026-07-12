@@ -8,13 +8,23 @@ namespace NOCS.HardKill
 
         internal static void HandleSetAircraft(Aircraft? aircraft)
         {
+            if (!NocsGuard.IsLocalPlayerAircraft(aircraft))
+            {
+                if (_boundAircraft == null)
+                    return;
+
+                UnbindMissileHandler();
+                MwsThreatFilter.Unbind();
+                HardKillController.ResetSession();
+                return;
+            }
+
+            if (_boundAircraft == aircraft)
+                return;
+
             UnbindMissileHandler();
             MwsThreatFilter.Unbind();
             HardKillController.ResetSession();
-
-            if (!NocsGuard.IsLocalPlayerAircraft(aircraft))
-                return;
-
             BindMissileHandler(aircraft!);
             MwsThreatFilter.Bind(aircraft!);
         }

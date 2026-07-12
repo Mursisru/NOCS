@@ -10,3 +10,5 @@ ffmpeg.exe
 local_build_scripts/
 _buildroot/
 .debug/
+
+_buildrefs/
