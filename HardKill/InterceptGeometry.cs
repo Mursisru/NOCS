@@ -77,7 +77,8 @@ namespace NOCS.HardKill
             if (closure <= 0f)
                 return sample;
 
-            sample.TimeToImpact = dist / closure;
+            float sizingClosure = ResolveEnvelopeSizingClosure(dist, closure);
+            sample.TimeToImpact = dist / sizingClosure;
 
             float tArm = defensiveStation != null
                 ? SeekerParamCache.GetArmDelay(defensiveStation)
@@ -118,7 +119,7 @@ namespace NOCS.HardKill
 
             float leadSec = Mathf.Min(maxLead, tEffective);
             float thetaKin = lateral / dist;
-            float thetaLead = Mathf.Atan(closure * leadSec / dist);
+            float thetaLead = Mathf.Atan(sizingClosure * leadSec / dist);
             float thetaTurn = Mathf.Min(trackAngleDeg, TurnRateDegPerSec * tEffective) * Mathf.Deg2Rad;
             float thetaTrack = trackAngleDeg * Mathf.Deg2Rad;
 
@@ -145,6 +146,14 @@ namespace NOCS.HardKill
             sample.ScreenDiameterPx = diameterPx;
 
             return FinalizeSample(threat, sample);
+        }
+
+        private static float ResolveEnvelopeSizingClosure(float dist, float closure)
+        {
+            float floor = NocsConfigCache.ClosureMinThreshold;
+            float maneuverWindow = Mathf.Max(0.5f, NocsConfigCache.MaxManeuverWindow);
+            float maxClosureForSizing = dist / maneuverWindow;
+            return Mathf.Clamp(closure, floor, maxClosureForSizing);
         }
 
         private static float ResolveMinDiameterPx()

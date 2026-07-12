@@ -6,6 +6,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+## [0.5.7] — 2026-07-12
+
+### Fixed
+
+- **ASE ring oversized** — merged radius capped to 28% screen width; envelope sizing closure clamped so Doppler-boosted preview closure no longer inflates lead angle / ring diameter.
+- **Single-threat ring on missile marker** — one inbound threat anchors the ring on the gun cross (velocity vector) with angular intercept radius only, not a bounding circle spanning gun cross → threat HUD icon.
+
+### Build
+
+- Display version: `0.5.7QV`
+- BepInPlugin semver: `0.5.7`
+
 ## [0.5.6] — 2026-07-12
 
 ### Fixed

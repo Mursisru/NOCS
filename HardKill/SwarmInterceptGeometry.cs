@@ -33,6 +33,7 @@ namespace NOCS.HardKill
         internal const int MaxThreats = 8;
         private const int BoundingRefinePasses = 2;
         private const float BoundingRefineStep = 0.35f;
+        private const float MaxMergedRadiusScreenFrac = 0.28f;
 
         private static readonly ThreatEnvelope[] Envelopes = new ThreatEnvelope[MaxThreats];
         private static int _envelopeCount;
@@ -96,8 +97,27 @@ namespace NOCS.HardKill
             if (_envelopeCount <= 0 || urgent == null)
                 return result;
 
+            if (_envelopeCount == 1)
+            {
+                if (!TryBuildSingleThreatCircle(out Vector2 singleCenter, out float singleRadius))
+                    return result;
+
+                result.Valid = singleRadius > 0f;
+                result.ThreatCount = 1;
+                result.ScreenCenter = singleCenter;
+                result.ScreenRadiusPx = singleRadius;
+                result.ScreenDiameterPx = singleRadius * 2f;
+                result.MinTimeToImpact = minImpact;
+                result.MinDistanceMeters = minDist;
+                result.MaxDistanceMeters = maxDist;
+                result.UrgentThreat = urgent;
+                return result;
+            }
+
             if (!TryBuildBoundingCircle(out Vector2 mergedCenter, out float mergedRadius))
                 return result;
+
+            mergedRadius = ClampMergedRadius(mergedRadius);
 
             result.Valid = mergedRadius > 0f;
             result.ThreatCount = _envelopeCount;
@@ -171,12 +191,31 @@ namespace NOCS.HardKill
             return _envelopeCount > 0;
         }
 
+        private static bool TryBuildSingleThreatCircle(out Vector2 center, out float radiusPx)
+        {
+            center = default;
+            radiusPx = 0f;
+
+            if (_envelopeCount != 1)
+                return false;
+
+            ThreatEnvelope envelope = Envelopes[0];
+            if (!envelope.Valid || envelope.ScreenRadiusPx <= 0f)
+                return false;
+
+            if (!TryResolveGunCrossScreenPos(out center))
+                center = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+
+            radiusPx = ClampMergedRadius(envelope.ScreenRadiusPx);
+            return radiusPx > 0f;
+        }
+
         private static bool TryBuildBoundingCircle(out Vector2 center, out float radiusPx)
         {
             center = default;
             radiusPx = 0f;
 
-            if (_envelopeCount <= 0)
+            if (_envelopeCount <= 1)
                 return false;
 
             if (!TryResolveNeutralCenter(out center))
@@ -198,13 +237,19 @@ namespace NOCS.HardKill
                 center = Vector2.Lerp(center, dominant.ScreenCenter, BoundingRefineStep);
             }
 
-            radiusPx = ResolveContainRadius(in center);
+            radiusPx = ClampMergedRadius(ResolveContainRadius(in center));
             return radiusPx > 0f;
+        }
+
+        private static float ClampMergedRadius(float radiusPx)
+        {
+            float maxPx = Screen.width * MaxMergedRadiusScreenFrac;
+            return Mathf.Min(Mathf.Max(0f, radiusPx), maxPx);
         }
 
         private static bool TryResolveNeutralCenter(out Vector2 center)
         {
-            if (_envelopeCount == 1 && TryResolveGunCrossScreenPos(out Vector2 gunCross))
+            if (TryResolveGunCrossScreenPos(out Vector2 gunCross))
             {
                 center = gunCross;
                 return true;
