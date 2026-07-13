@@ -6,6 +6,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+## [0.6.13] — 2026-07-13
+
+### Fixed
+
+- **ASE status cue missing in MP** — `WeaponHudHintAnchor` resolves missile HUD hint, inactive weapon-state hint, or `targetDesignator` fallback; inherits `CanvasGroup` alpha. Short RWR flicker hold (200 ms) prevents cue dropouts.
+
+### Build
+
+- Display version: `0.6.13QV`
+- BepInPlugin semver: `0.6.13`
+
 ## [0.6.12] — 2026-07-13
 
 ### Build

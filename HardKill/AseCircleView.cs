@@ -1,4 +1,3 @@
-using System.Reflection;
 using NOCS.Config;
 using NOCS.Core;
 using NOCS.Util;
@@ -32,10 +31,6 @@ namespace NOCS.HardKill
             PotentialHit = 1,
             Shoot = 2,
         }
-
-        private static FieldInfo? _combatHudWeaponStateField;
-        private static FieldInfo? _hintFieldCache;
-        private static System.Type? _hintFieldOwnerType;
 
         private readonly GameObject _ringRoot;
         private readonly Image _ringImage;
@@ -262,7 +257,8 @@ namespace NOCS.HardKill
                 return;
             }
 
-            if (!TryResolveWeaponHint(out Text? hint) || hint == null)
+            if (!WeaponHudHintAnchor.TryResolve(out Text? typographyHint, out RectTransform? anchor)
+                || anchor == null)
             {
                 SetStatusVisible(false);
                 return;
@@ -271,9 +267,14 @@ namespace NOCS.HardKill
             try
             {
                 SetStatusCueMode(mode);
-                ApplyHintTypography(hint);
-                ApplyNotchColor(sample.UrgentThreat);
-                if (!TryPlaceStatusUnderHint(hint))
+                Text? fontSource = WeaponHudHintAnchor.ResolveTypographyHint(
+                    SceneSingleton<CombatHUD>.i!,
+                    typographyHint);
+                if (fontSource != null)
+                    ApplyHintTypography(fontSource);
+
+                ApplyNotchColor(sample.UrgentThreat, anchor);
+                if (!TryPlaceStatusUnderAnchor(anchor))
                 {
                     SetStatusVisible(false);
                     return;
@@ -479,28 +480,29 @@ namespace NOCS.HardKill
                 _statusLabel.material = hint.material;
         }
 
-        private void ApplyNotchColor(Missile? threat)
+        private void ApplyNotchColor(Missile? threat, RectTransform anchor)
         {
             if (_statusLabel == null)
                 return;
 
+            Color baseColor;
             if (AseNotchStyle.TryGetNotchReference(out Image? notch) && notch != null)
-                _statusLabel.color = AseNotchStyle.ResolveLabelColorFromImage(notch);
+                baseColor = AseNotchStyle.ResolveLabelColorFromImage(notch);
             else
-                _statusLabel.color = AseNotchStyle.ResolveColor(threat);
+                baseColor = AseNotchStyle.ResolveColor(threat);
+
+            float alpha = WeaponHudHintAnchor.ResolveInheritedAlpha(anchor);
+            baseColor.a *= alpha;
+            _statusLabel.color = baseColor;
         }
 
-        private bool TryPlaceStatusUnderHint(Text hint)
+        private bool TryPlaceStatusUnderAnchor(RectTransform anchor)
         {
-            if (_statusRect == null || hint == null)
+            if (_statusRect == null || anchor == null)
                 return false;
 
-            RectTransform hintRt = hint.rectTransform;
-            if (hintRt == null)
-                return false;
-
-            if (_statusRect.parent != hintRt)
-                _statusRect.SetParent(hintRt, false);
+            if (_statusRect.parent != anchor)
+                _statusRect.SetParent(anchor, false);
 
             _statusRect.anchorMin = new Vector2(0.5f, 0f);
             _statusRect.anchorMax = new Vector2(0.5f, 0f);
@@ -508,17 +510,17 @@ namespace NOCS.HardKill
             _statusRect.localRotation = Quaternion.identity;
             _statusRect.localScale = Vector3.one;
 
-            float width = hintRt.rect.width;
+            float width = anchor.rect.width;
             if (width < 1f)
-                width = hint.preferredWidth;
+                width = anchor.sizeDelta.x;
             if (width < 1f)
-                width = hintRt.sizeDelta.x;
+                width = 120f;
 
-            float height = hintRt.rect.height;
+            float height = anchor.rect.height;
             if (height < 1f)
-                height = hint.preferredHeight;
+                height = anchor.sizeDelta.y;
             if (height < 1f)
-                height = hint.fontSize;
+                height = _statusLabel != null ? _statusLabel.fontSize : 14f;
 
             _statusRect.sizeDelta = new Vector2(Mathf.Max(width, 1f), Mathf.Max(height, 1f));
             _statusRect.anchoredPosition = new Vector2(0f, -StatusCueGapLocalPx);
@@ -589,39 +591,6 @@ namespace NOCS.HardKill
                 return CueMode.PotentialHit;
 
             return CueMode.Hidden;
-        }
-
-        private static bool TryResolveWeaponHint(out Text? hint)
-        {
-            hint = null;
-            CombatHUD? combatHud = SceneSingleton<CombatHUD>.i;
-            if (combatHud == null)
-                return false;
-
-            _combatHudWeaponStateField ??= typeof(CombatHUD).GetField(
-                "weaponState",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            if (_combatHudWeaponStateField == null)
-                return false;
-
-            object? stateObj = _combatHudWeaponStateField.GetValue(combatHud);
-            if (stateObj is not HUDWeaponState weaponState || weaponState == null)
-                return false;
-
-            System.Type stateType = weaponState.GetType();
-            if (_hintFieldCache == null || _hintFieldOwnerType != stateType)
-            {
-                _hintFieldOwnerType = stateType;
-                _hintFieldCache = stateType.GetField(
-                    "hint",
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-            }
-
-            if (_hintFieldCache == null)
-                return false;
-
-            hint = _hintFieldCache.GetValue(weaponState) as Text;
-            return hint != null;
         }
 
         private static Quaternion ResolveRadialGlyphRotation(Vector2 anchoredPos, bool bottomBank)

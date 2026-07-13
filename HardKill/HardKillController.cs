@@ -15,6 +15,8 @@ namespace NOCS.HardKill
         private static AseCircleView? _aseView;
         private static Transform? _aseCanvas;
         private static SwarmInterceptSample _lastAseSample;
+        private static float _lastAseSampleTime = -1000f;
+        private const float StatusCueHoldSec = 0.2f;
 
         internal static void RunTick(float dt)
         {
@@ -307,13 +309,25 @@ namespace NOCS.HardKill
             try
             {
                 IReadOnlyList<Missile> threats = MwsThreatFilter.GetFireControlScratch(aircraft, defensive);
-                if (threats.Count == 0 || !MwsRwrGate.HasRwrPicture(aircraft))
+                bool rwrLive = MwsRwrGate.HasRwrPicture(aircraft) && threats.Count > 0;
+                if (!rwrLive)
                 {
+                    if (_lastAseSample.Valid
+                        && NocsConfigCache.RenderRadialText
+                        && Time.time - _lastAseSampleTime < StatusCueHoldSec)
+                    {
+                        EnsureAseView();
+                        _aseView?.Apply(in _lastAseSample, aircraft, defensive);
+                        return _lastAseSample;
+                    }
+
                     _aseView?.SetVisible(false);
                     return default;
                 }
 
                 SwarmInterceptSample sample = SwarmInterceptGeometry.Compute(aircraft, threats, defensive);
+                _lastAseSample = sample;
+                _lastAseSampleTime = Time.time;
                 if (!NocsConfigCache.RenderAseCircle && !NocsConfigCache.RenderRadialText)
                 {
                     _aseView?.SetVisible(false);
