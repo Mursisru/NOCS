@@ -1,4 +1,6 @@
+using System;
 using NOCS.Core;
+using NOCS.Util;
 
 namespace NOCS.HardKill
 {
@@ -7,6 +9,18 @@ namespace NOCS.HardKill
         private static Aircraft? _boundAircraft;
 
         internal static void HandleSetAircraft(Aircraft? aircraft)
+        {
+            try
+            {
+                HandleSetAircraftCore(aircraft);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsAircraftBinder.HandleSetAircraft", ex);
+            }
+        }
+
+        private static void HandleSetAircraftCore(Aircraft? aircraft)
         {
             if (!NocsGuard.IsLocalPlayerAircraft(aircraft))
             {
@@ -40,19 +54,33 @@ namespace NOCS.HardKill
         /// </summary>
         internal static void EnsureBound(Aircraft aircraft)
         {
-            if (!NocsGuard.IsLocalPlayerAircraft(aircraft))
-                return;
+            try
+            {
+                if (!NocsGuard.IsLocalPlayerAircraft(aircraft))
+                    return;
 
-            if (_boundAircraft == aircraft)
-                return;
+                if (_boundAircraft == aircraft)
+                    return;
 
-            HandleSetAircraft(aircraft);
+                HandleSetAircraftCore(aircraft);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsAircraftBinder.EnsureBound", ex);
+            }
         }
 
         internal static void SafeUnbind()
         {
-            UnbindMissileHandler();
-            MwsThreatFilter.Unbind();
+            try
+            {
+                UnbindMissileHandler();
+                MwsThreatFilter.Unbind();
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsAircraftBinder.SafeUnbind", ex);
+            }
         }
 
         private static void BindMissileHandler(Aircraft aircraft)
@@ -84,7 +112,14 @@ namespace NOCS.HardKill
 
         private static void OnRegisterMissileHandler(Missile missile)
         {
-            HardKillController.HandleOwnMissileRegistered(missile);
+            try
+            {
+                HardKillController.HandleOwnMissileRegistered(missile);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsAircraftBinder.onRegisterMissile", ex);
+            }
         }
     }
 }

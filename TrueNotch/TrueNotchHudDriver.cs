@@ -23,6 +23,23 @@ namespace NOCS.TrueNotch
             Vector3 evasionVector,
             float dt)
         {
+            try
+            {
+                ApplyLiveCore(aircraft, missile, notchBox, evasionVector, dt);
+            }
+            catch (System.Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("TrueNotchHudDriver.ApplyLive", ex);
+            }
+        }
+
+        private static void ApplyLiveCore(
+            Aircraft aircraft,
+            Missile missile,
+            Image notchBox,
+            Vector3 evasionVector,
+            float dt)
+        {
             if (!NocsConfigCache.TrueNotchEnabled)
                 return;
 
@@ -35,6 +52,9 @@ namespace NOCS.TrueNotch
             int frame = Time.frameCount;
             PersistentID missileId = missile.persistentID;
             if (frame == _lastApplyFrame && missileId == _lastApplyMissileId)
+                return;
+
+            if (notchBox == null)
                 return;
 
             RectTransform? rect = notchBox.rectTransform;
@@ -60,23 +80,30 @@ namespace NOCS.TrueNotch
 
         internal static void RunTick(float dt)
         {
-            if (!NocsConfigCache.TrueNotchEnabled || !GameManager.flightControlsEnabled)
-                return;
+            try
+            {
+                if (!NocsConfigCache.TrueNotchEnabled || !GameManager.flightControlsEnabled)
+                    return;
 
-            if (!GameManager.GetLocalAircraft(out Aircraft aircraft) || aircraft == null)
-                return;
+                if (!GameManager.GetLocalAircraft(out Aircraft aircraft) || aircraft == null)
+                    return;
 
-            if (!NocsGuard.IsLocalPlayerAircraft(aircraft))
-                return;
+                if (!NocsGuard.IsLocalPlayerAircraft(aircraft))
+                    return;
 
-            if (!NotchTelemetryBridge.TryPeek(out NotchTelemetrySample telemetry, out Image? notchBox) || notchBox == null)
-                return;
+                if (!NotchTelemetryBridge.TryPeek(out NotchTelemetrySample telemetry, out Image? notchBox) || notchBox == null)
+                    return;
 
-            Missile? missile = ResolveMissile(telemetry.MissileId);
-            if (!NocsGuard.IsValidMissile(missile))
-                return;
+                Missile? missile = ResolveMissile(telemetry.MissileId);
+                if (!NocsGuard.IsValidMissile(missile))
+                    return;
 
-            ApplyLive(aircraft, missile!, notchBox, telemetry.EvasionVector, dt);
+                ApplyLiveCore(aircraft, missile!, notchBox, telemetry.EvasionVector, dt);
+            }
+            catch (System.Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("TrueNotchHudDriver.RunTick", ex);
+            }
         }
 
         private static void ApplySampleWidth(RectTransform rect, float targetWidth, float dt)

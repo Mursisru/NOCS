@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using BepInEx.Logging;
 using HarmonyLib;
@@ -5,6 +6,7 @@ using NOCS.Config;
 using NOCS.Core;
 using NOCS.HardKill;
 using NOCS.TrueNotch;
+using NOCS.Util;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -36,11 +38,19 @@ namespace NOCS
 
         private void OnDestroy()
         {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
-            NocsAircraftBinder.SafeUnbind();
-            HardKillController.DisposeViews();
-            TrueNotchHudDriver.DisposeViews();
-            _harmony?.UnpatchSelf();
+            try
+            {
+                SceneManager.sceneLoaded -= OnSceneLoaded;
+                NocsAircraftBinder.SafeUnbind();
+                HardKillController.DisposeViews();
+                TrueNotchHudDriver.DisposeViews();
+                _harmony?.UnpatchSelf();
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsHost.OnDestroy", ex);
+            }
+
             _harmony = null;
             if (_instance == this)
                 _instance = null;
@@ -48,20 +58,34 @@ namespace NOCS
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            if (_missionReady)
-                return;
+            try
+            {
+                if (_missionReady)
+                    return;
 
-            if (IsMenuOrSystemScene(scene.path))
-                return;
+                if (IsMenuOrSystemScene(scene.path))
+                    return;
 
-            ScheduleMissionStartup(scene.path);
+                ScheduleMissionStartup(scene.path);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsHost.OnSceneLoaded", ex);
+            }
         }
 
         private void TryBootstrapCurrentScene()
         {
-            Scene scene = SceneManager.GetActiveScene();
-            if (!IsMenuOrSystemScene(scene.path))
-                ScheduleMissionStartup(scene.path);
+            try
+            {
+                Scene scene = SceneManager.GetActiveScene();
+                if (!IsMenuOrSystemScene(scene.path))
+                    ScheduleMissionStartup(scene.path);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsHost.TryBootstrapCurrentScene", ex);
+            }
         }
 
         private void ScheduleMissionStartup(string scenePath)
@@ -88,25 +112,40 @@ namespace NOCS
             if (!_missionReady)
                 return;
 
-            NocsHudBootstrap.EnsureAttached();
-
-            NocsHudRoot? root = NocsHudRoot.Instance;
-            if (root != null)
+            try
             {
-                root.RunTick(Time.deltaTime);
-                return;
-            }
+                NocsHudBootstrap.EnsureAttached();
 
-            TrueNotchHudDriver.RunTick(Time.deltaTime);
-            HardKillController.RunTick(Time.deltaTime);
+                NocsHudRoot? root = NocsHudRoot.Instance;
+                if (root != null)
+                {
+                    root.RunTick(Time.deltaTime);
+                    return;
+                }
+
+                TrueNotchHudDriver.RunTick(Time.deltaTime);
+                HardKillController.RunTick(Time.deltaTime);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsHost.LateUpdate", ex);
+            }
         }
 
         private void StartupMission(string scenePath)
         {
-            NocsConfigCache.RefreshFromBepIn();
-            ApplyHarmonyPatches();
-            NocsHudBootstrap.EnsureAttached();
-            _logger?.LogInfo("NOCS host ready (mission) v" + AppVersion.DisplayVersion + " scene=" + scenePath);
+            try
+            {
+                NocsConfigCache.RefreshFromBepIn();
+                ApplyHarmonyPatches();
+                NocsHudBootstrap.EnsureAttached();
+                _logger?.LogInfo("NOCS host ready (mission) v" + AppVersion.DisplayVersion + " scene=" + scenePath);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsHost.StartupMission", ex);
+                _logger?.LogError("NOCS mission startup failed: " + ex.Message);
+            }
         }
 
         private void ApplyHarmonyPatches()

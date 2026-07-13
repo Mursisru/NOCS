@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NOCS.Util;
 using NOCS.Config;
@@ -16,6 +17,25 @@ namespace NOCS.HardKill
         private static SwarmInterceptSample _lastAseSample;
 
         internal static void RunTick(float dt)
+        {
+            try
+            {
+                RunTickCore(dt);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("HardKillController.RunTick", ex);
+                try
+                {
+                    _aseView?.SetVisible(false);
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        private static void RunTickCore(float dt)
         {
             if (!NocsConfigCache.HardKillEnabled)
             {
@@ -55,17 +75,21 @@ namespace NOCS.HardKill
             bool hotkeySalvoThisTick = false;
             bool locked = Allocator.IsHardwareSalvoLocked();
             bool shootOpen = HotTriggerGate.IsSalvoTriggerAllowed(in sample, defensive, aircraft);
+            bool autoShootOpen = HotTriggerGate.IsAutoEngageTriggerAllowed(in sample, defensive, aircraft);
+            bool manualSalvoContinue = Session.Active
+                && Session.ManualEngagement
+                && HotTriggerGate.IsActiveSalvoContinueAllowed(aircraft);
 
             if (NocsHotKey.WasPressed(NocsConfigCache.HotKeyModifier, NocsConfigCache.HotKey))
             {
-                // Geometry gate always uses the best available defensive station — never the
-                // last-fired mount (short-range IR could falsely fail AllEnvelopesInWeaponRange).
-                if (!locked && shootOpen)
+                bool canHotkeyStart = !Session.Active && !locked && shootOpen;
+                bool canHotkeyExtend = Session.Active && (shootOpen || manualSalvoContinue);
+                if (canHotkeyStart || canHotkeyExtend)
                 {
                     if (Session.Active)
                         Allocator.ExtendEngagement(aircraft, defensive);
                     else if (Allocator.PrepareEngagement(aircraft, defensive))
-                        BeginSession(aircraft);
+                        TryBeginSession(aircraft, manual: true);
 
                     if (Session.Active && !Allocator.IsSalvoComplete)
                     {
@@ -74,21 +98,23 @@ namespace NOCS.HardKill
                     }
                 }
             }
-            else if (NocsConfigCache.AutoEngage
-                && !Session.Active
-                && !locked
-                && shootOpen)
+            else if (!Session.Active && !locked && autoShootOpen)
             {
                 if (Allocator.PrepareEngagement(aircraft, defensive))
                 {
-                    BeginSession(aircraft);
-                    if (Session.Active && !Allocator.IsSalvoComplete)
+                    if (TryBeginSession(aircraft, manual: false)
+                        && Session.Active
+                        && !Allocator.IsSalvoComplete)
                     {
                         Allocator.RunSalvo(aircraft, 0f, defensive);
                         hotkeySalvoThisTick = true;
                     }
                 }
             }
+
+            bool mayContinueSalvo = hotkeySalvoThisTick
+                || (Session.ManualEngagement && (shootOpen || manualSalvoContinue))
+                || (!Session.ManualEngagement && autoShootOpen);
 
             if (!Session.Active)
                 return;
@@ -97,9 +123,7 @@ namespace NOCS.HardKill
 
             if (Allocator.IsHardwareSalvoLocked())
             {
-                // Keep session alive for remaining threats, but never spin fire while locked.
-                if (Allocator.IsSalvoComplete)
-                    Allocator.TryKeepSessionAlive(aircraft, defensive);
+                Allocator.TryKeepSessionAlive(aircraft, defensive);
                 return;
             }
 
@@ -107,8 +131,7 @@ namespace NOCS.HardKill
             {
                 if (Allocator.TryKeepSessionAlive(aircraft, defensive))
                 {
-                    if (!hotkeySalvoThisTick
-                        && HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, defensive, aircraft))
+                    if (!hotkeySalvoThisTick && mayContinueSalvo)
                         Allocator.RunSalvo(aircraft, dt, defensive);
                     return;
                 }
@@ -118,8 +141,7 @@ namespace NOCS.HardKill
                 return;
             }
 
-            if (!hotkeySalvoThisTick
-                && HotTriggerGate.IsSalvoTriggerAllowed(in _lastAseSample, defensive, aircraft))
+            if (!hotkeySalvoThisTick && mayContinueSalvo)
                 Allocator.RunSalvo(aircraft, dt, defensive);
         }
 
@@ -141,6 +163,18 @@ namespace NOCS.HardKill
         }
 
         internal static void HandleOwnMissileRegistered(Missile missile)
+        {
+            try
+            {
+                HandleOwnMissileRegisteredCore(missile);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("HardKillController.HandleOwnMissileRegistered", ex);
+            }
+        }
+
+        private static void HandleOwnMissileRegisteredCore(Missile missile)
         {
             if (!Session.Active || !Session.RestorePending)
                 return;
@@ -207,57 +241,102 @@ namespace NOCS.HardKill
             Session.PendingLaunchStamp = -1000f;
         }
 
-        private static void BeginSession(Aircraft aircraft)
+        private static bool TryBeginSession(Aircraft aircraft, bool manual)
         {
-            if (!NocsGuard.CanMutateLocalWeapons(aircraft))
-                return;
-
-            if (!Session.SnapshotCaptured)
+            try
             {
-                Session.SavedTargets = TargetSnapshotStore.Capture(aircraft);
-                Session.SnapshotCaptured = true;
+                if (!NocsGuard.CanMutateLocalWeapons(aircraft))
+                    return false;
+
+                if (!Session.SnapshotCaptured)
+                {
+                    Session.SavedTargets = TargetSnapshotStore.Capture(aircraft);
+                    Session.SnapshotCaptured = true;
+                }
+
+                if (!Allocator.TryEstablishCurrentThreatTrack(aircraft))
+                {
+                    TargetRestoreValidator.Restore(aircraft, Session.SavedTargets);
+                    Session.SnapshotCaptured = false;
+                    Session.SavedTargets = TargetSnapshot.Empty;
+                    return false;
+                }
+
+                Session.Active = true;
+                Session.ManualEngagement = manual;
+                Session.RestorePending = true;
+                Session.PendingOwnLaunches = 0;
+                Session.PendingLaunchStamp = -1000f;
+                return true;
             }
-
-            aircraft.weaponManager?.ClearTargetList();
-            Allocator.RepointTargets(aircraft);
-
-            Session.Active = true;
-            Session.RestorePending = true;
-            Session.PendingOwnLaunches = 0;
-            Session.PendingLaunchStamp = -1000f;
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("HardKillController.TryBeginSession", ex);
+                Session.Reset();
+                return false;
+            }
         }
 
         private static void FinishSession(Aircraft aircraft)
         {
-            if (Session.SnapshotCaptured)
-                TargetRestoreValidator.Restore(aircraft, Session.SavedTargets);
+            try
+            {
+                if (Session.SnapshotCaptured)
+                    TargetRestoreValidator.Restore(aircraft, Session.SavedTargets);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("HardKillController.FinishSession.Restore", ex);
+            }
 
             Session.Reset();
             Allocator.Reset(clearHardwarePairLock: false);
-            _aseView?.SetVisible(false);
+            try
+            {
+                _aseView?.SetVisible(false);
+            }
+            catch
+            {
+            }
         }
 
         private static SwarmInterceptSample UpdateAsePreview(
             Aircraft aircraft,
             WeaponStation? defensive)
         {
-            IReadOnlyList<Missile> threats = MwsThreatFilter.GetPreviewScratch(aircraft, defensive);
-            if (threats.Count == 0)
+            try
             {
-                _aseView?.SetVisible(false);
-                return default;
-            }
+                IReadOnlyList<Missile> threats = MwsThreatFilter.GetFireControlScratch(aircraft, defensive);
+                if (threats.Count == 0 || !MwsRwrGate.HasRwrPicture(aircraft))
+                {
+                    _aseView?.SetVisible(false);
+                    return default;
+                }
 
-            SwarmInterceptSample sample = SwarmInterceptGeometry.Compute(aircraft, threats, defensive);
-            if (!NocsConfigCache.RenderAseCircle && !NocsConfigCache.RenderRadialText)
-            {
-                _aseView?.SetVisible(false);
+                SwarmInterceptSample sample = SwarmInterceptGeometry.Compute(aircraft, threats, defensive);
+                if (!NocsConfigCache.RenderAseCircle && !NocsConfigCache.RenderRadialText)
+                {
+                    _aseView?.SetVisible(false);
+                    return sample;
+                }
+
+                EnsureAseView();
+                _aseView?.Apply(in sample, aircraft, defensive);
                 return sample;
             }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("HardKillController.UpdateAsePreview", ex);
+                try
+                {
+                    _aseView?.SetVisible(false);
+                }
+                catch
+                {
+                }
 
-            EnsureAseView();
-            _aseView?.Apply(in sample, aircraft, defensive);
-            return sample;
+                return default;
+            }
         }
 
         private static WeaponStation? ResolveActiveDefensiveStation(Aircraft aircraft)

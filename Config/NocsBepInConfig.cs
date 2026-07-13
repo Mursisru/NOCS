@@ -20,6 +20,8 @@ namespace NOCS.Config
         internal static ConfigEntry<KeyCode> HotKey { get; private set; } = null!;
         internal static ConfigEntry<WeaponPriority> WeaponPriority { get; private set; } = null!;
         internal static ConfigEntry<WeaponFilterMode> WeaponFilterMode { get; private set; } = null!;
+        internal static ConfigEntry<bool> EngageIrThreats { get; private set; } = null!;
+        internal static ConfigEntry<int> IrInterceptBlockedAboveFlares { get; private set; } = null!;
 
         internal static ConfigEntry<bool> RenderAseCircle { get; private set; } = null!;
         internal static ConfigEntry<bool> RenderRadialText { get; private set; } = null!;
@@ -126,6 +128,12 @@ namespace NOCS.Config
                 new ConfigDescription("TTI low-pass alpha. Lower = smoother; higher = closer to raw physics.", new AcceptableValueRange<float>(0.01f, 1f)));
             ClosureMinThreshold = config.Bind(signal, "ClosureMinThreshold", 0.1f,
                 new ConfigDescription("Minimum closure speed (m/s) used as a floor for TTI and range gates.", new AcceptableValueRange<float>(0.01f, 100f)));
+            EngageIrThreats = config.Bind(signal, "EngageIrThreats", false,
+                "When IrInterceptBlockedAboveFlares is 0: master switch for inbound IR (80° FOV). Ignored when X > 0 (flare count gates IR inbound).");
+            IrInterceptBlockedAboveFlares = config.Bind(signal, "IrInterceptBlockedAboveFlares", 4,
+                new ConfigDescription(
+                    "X = HUD flare count. Engage inbound IR while remaining flares < X (80° FOV). Own IR pylons always fire first until empty, then radar. 0 = use EngageIrThreats only (no flare gate).",
+                    new AcceptableValueRange<int>(0, 128)));
 
             const string warningTti = "WarningTTI";
             WarningTtiEnabled = config.Bind(warningTti, "Enabled", true, "Append TTI suffix to MWS threat labels.");
@@ -171,6 +179,8 @@ namespace NOCS.Config
                 WarningTtiEnabled = WarningTtiEnabled.Value,
                 TtiSmoothingFactor = TtiSmoothingFactor.Value,
                 ClosureMinThreshold = ClosureMinThreshold.Value,
+                EngageIrThreats = EngageIrThreats.Value,
+                IrInterceptBlockedAboveFlares = IrInterceptBlockedAboveFlares.Value,
             };
         }
 
@@ -209,6 +219,8 @@ namespace NOCS.Config
             WarningTtiEnabled.SettingChanged += OnAnySettingChanged;
             TtiSmoothingFactor.SettingChanged += OnAnySettingChanged;
             ClosureMinThreshold.SettingChanged += OnAnySettingChanged;
+            EngageIrThreats.SettingChanged += OnAnySettingChanged;
+            IrInterceptBlockedAboveFlares.SettingChanged += OnAnySettingChanged;
         }
 
         private static void OnAnySettingChanged(object sender, System.EventArgs e)
@@ -252,5 +264,7 @@ namespace NOCS.Config
         internal bool WarningTtiEnabled;
         internal float TtiSmoothingFactor;
         internal float ClosureMinThreshold;
+        internal bool EngageIrThreats;
+        internal int IrInterceptBlockedAboveFlares;
     }
 }

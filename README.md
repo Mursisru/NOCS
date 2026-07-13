@@ -2,7 +2,7 @@
 
 [![Nuclear Option](https://img.shields.io/badge/Game-Nuclear%20Option-blue)](https://store.steampowered.com/app/2168680/Nuclear_Option/)
 [![BepInEx 5](https://img.shields.io/badge/Loader-BepInEx%205-orange)](https://docs.bepinex.dev/)
-[![Version](https://img.shields.io/badge/Version-0.5.34QV-green)](https://github.com/Mursisru/NOCS/releases/tag/v0.5.34)
+[![Version](https://img.shields.io/badge/Version-0.5.35QV-green)](https://github.com/Mursisru/NOCS/releases/tag/v0.5.35)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![.NET Framework 4.8](https://img.shields.io/badge/.NET%20Framework-4.8-512BD4)](https://dotnet.microsoft.com/download/dotnet-framework/net48)
 
@@ -21,7 +21,7 @@
 
 BepInEx 5 plugin for the flight sim **Nuclear Option** with two independent HUD systems: passive TrueNotch radar-jam width and active Hard-Kill APS with swarm ASE fire-control geometry.
 
-**Plugin GUID:** `com.at747.nocs.bepinex` · **Display version:** `0.5.34QV` · **BepInPlugin semver:** `0.5.34`
+**Plugin GUID:** `com.at747.nocs.bepinex` · **Display version:** `0.5.35QV` · **BepInPlugin semver:** `0.5.35`
 
 ---
 

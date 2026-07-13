@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Reflection;
 using NOCS.Config;
 using NOCS.Core;
 using UnityEngine;
@@ -17,18 +16,15 @@ namespace NOCS.HardKill
         private const int MaxThreats = 8;
         private const float MinRelVelSqr = 0.001f;
         private const float MinDefensiveSpeedMps = 50f;
-        private const float FovConeAngleDeg = 50f;
-        private static readonly float FovHalfCos = Mathf.Cos((FovConeAngleDeg * 0.5f) * Mathf.Deg2Rad);
 
         private static readonly List<Missile> PreviewScratch = new List<Missile>(MaxThreats);
         private static readonly List<Missile> EngageScratch = new List<Missile>(MaxThreats);
         private static readonly List<Missile> SalvoScratch = new List<Missile>(MaxThreats);
+        private static readonly List<Missile> FireControlScratch = new List<Missile>(MaxThreats);
         private static readonly int[] CandidateIndices = new int[MaxThreats];
         private static readonly float[] CandidateDist = new float[MaxThreats];
         private static readonly float[] CandidateClosure = new float[MaxThreats];
         private static readonly List<Missile> ScanMissiles = new List<Missile>(16);
-
-        private static FieldInfo? _unknownMissilesField;
 
         private static int _cachedPreviewFrame = -1;
         private static Aircraft? _cachedPreviewAircraft;
@@ -38,6 +34,9 @@ namespace NOCS.HardKill
         private static WeaponStation? _cachedEngageStation;
         private static int _cachedSalvoFrame = -1;
         private static Aircraft? _cachedSalvoAircraft;
+        private static int _cachedFireControlFrame = -1;
+        private static Aircraft? _cachedFireControlAircraft;
+        private static WeaponStation? _cachedFireControlStation;
 
         private static int _activeWeaponFrame = -1;
         private static Aircraft? _activeWeaponAircraft;
@@ -54,6 +53,7 @@ namespace NOCS.HardKill
             PreviewScratch.Clear();
             EngageScratch.Clear();
             SalvoScratch.Clear();
+            FireControlScratch.Clear();
             InvalidateFrameCache();
         }
 
@@ -67,6 +67,9 @@ namespace NOCS.HardKill
             _cachedEngageStation = null;
             _cachedSalvoFrame = -1;
             _cachedSalvoAircraft = null;
+            _cachedFireControlFrame = -1;
+            _cachedFireControlAircraft = null;
+            _cachedFireControlStation = null;
             _activeWeaponFrame = -1;
             _activeWeaponAircraft = null;
             _activeWeaponPreferred = null;
@@ -124,6 +127,36 @@ namespace NOCS.HardKill
             return SalvoScratch;
         }
 
+        /// <summary>
+        /// ASE / SHOOT sample — preview threats confirmed on local RWR only.
+        /// </summary>
+        internal static IReadOnlyList<Missile> GetFireControlScratch(
+            Aircraft aircraft,
+            WeaponStation? defensiveStation)
+        {
+            int frame = Time.frameCount;
+            if (ReferenceEquals(_cachedFireControlAircraft, aircraft)
+                && ReferenceEquals(_cachedFireControlStation, defensiveStation)
+                && _cachedFireControlFrame == frame)
+            {
+                return FireControlScratch;
+            }
+
+            _cachedFireControlFrame = frame;
+            _cachedFireControlAircraft = aircraft;
+            _cachedFireControlStation = defensiveStation;
+            FireControlScratch.Clear();
+
+            if (!MwsRwrGate.HasRwrPicture(aircraft))
+                return FireControlScratch;
+
+            IReadOnlyList<Missile> preview = GetPreviewScratch(aircraft, defensiveStation);
+            for (int i = 0; i < preview.Count; i++)
+                TryAddUnique(FireControlScratch, preview[i]);
+
+            return FireControlScratch;
+        }
+
         internal static int CountSalvoThreats(Aircraft aircraft)
         {
             return GetSalvoScratch(aircraft).Count;
@@ -149,10 +182,10 @@ namespace NOCS.HardKill
                 return 0;
 
             MissileWarning? warning = aircraft.GetMissileWarningSystem();
-            if (warning?.knownMissiles == null)
+            if (warning?.knownMissiles == null || !MwsRwrGate.HasRwrPicture(aircraft))
                 return 0;
 
-            BuildScanList(warning, includeUnknown: true);
+            MwsRwrGate.AppendRwrScanList(warning, ScanMissiles);
 
             Vector3 acPos = aircraft.rb.position;
             Vector3 noseForward = aircraft.transform.forward;
@@ -161,6 +194,7 @@ namespace NOCS.HardKill
             float maxRange = NocsConfigCache.MaxLaunchRangeMeters;
 
             List<Missile> scan = ScanMissiles;
+            int candidateCount = 0;
             for (int i = 0; i < scan.Count; i++)
             {
                 Missile? missile = scan[i];
@@ -173,17 +207,22 @@ namespace NOCS.HardKill
 
                 Vector3 mPos = missileRb.position;
 
-                // Absolute first filter: nose FOV 50° — out-of-cone never enters threat set.
-                if (!IsInsideNoseFov(noseForward, acPos, mPos))
+                if (!IncomingThreatPolicy.PassesNoseFov(noseForward, acPos, missile, mPos))
                     continue;
 
-                if (!IsEngageableThreatOnSelf(missile, selfId, playerHq))
+                if (!IsEngageableThreatOnSelf(aircraft, warning, missile, selfId, playerHq))
                     continue;
 
                 float dist = (acPos - mPos).magnitude;
                 if (dist > maxRange)
                     continue;
 
+                TryAddSalvoCandidate(i, dist, ref candidateCount);
+            }
+
+            for (int c = 0; c < candidateCount; c++)
+            {
+                Missile missile = scan[CandidateIndices[c]];
                 TryAddUnique(buffer, missile);
             }
 
@@ -202,11 +241,11 @@ namespace NOCS.HardKill
                 return 0;
 
             MissileWarning? warning = aircraft.GetMissileWarningSystem();
-            if (warning?.knownMissiles == null)
+            if (warning?.knownMissiles == null || !MwsRwrGate.HasRwrPicture(aircraft))
                 return 0;
 
             bool previewMode = mode == MwsCollectMode.Preview;
-            BuildScanList(warning, previewMode);
+            MwsRwrGate.AppendRwrScanList(warning, ScanMissiles);
 
             Camera? cam = SceneSingleton<CameraStateManager>.i?.mainCamera;
             if (cam == null && !previewMode)
@@ -250,11 +289,10 @@ namespace NOCS.HardKill
 
                 Vector3 mPos = missileRb.position;
 
-                // Absolute first filter: nose FOV 50° — before seeker / CPA / ASE.
-                if (!IsInsideNoseFov(noseForward, acPos, mPos))
+                if (!IncomingThreatPolicy.PassesNoseFov(noseForward, acPos, missile, mPos))
                     continue;
 
-                if (!IsEngageableThreatOnSelf(missile, selfId, playerHq))
+                if (!IsEngageableThreatOnSelf(aircraft, warning, missile, selfId, playerHq))
                     continue;
 
                 if (!previewMode)
@@ -447,15 +485,17 @@ namespace NOCS.HardKill
             }
             else
             {
-                WeaponStation? selected = aircraft.weaponManager?.currentWeaponStation;
-                if (selected != null && WeaponStationCatalog.IsEligibleStation(selected, aircraft))
+                // Hard-Kill ASE/SHOOT must match launch priority: IR-first, then radar.
+                IReadOnlyList<WeaponStationEntry> stations = WeaponStationCatalog.Build(aircraft);
+                if (IncomingThreatPolicy.ShouldUseIrInterceptPhase(stations))
                 {
-                    resolved = selected;
+                    WeaponStationEntry? ir = PickCatalogStation(stations, wantIr: true);
+                    resolved = ir?.Station;
                 }
                 else
                 {
-                    IReadOnlyList<WeaponStationEntry> stations = WeaponStationCatalog.Build(aircraft);
-                    resolved = stations.Count > 0 ? stations[0].Station : null;
+                    WeaponStationEntry? radar = PickCatalogStation(stations, wantIr: false);
+                    resolved = radar?.Station ?? (stations.Count > 0 ? stations[0].Station : null);
                 }
             }
 
@@ -466,50 +506,21 @@ namespace NOCS.HardKill
             return resolved;
         }
 
-        private static void BuildScanList(MissileWarning warning, bool includeUnknown)
+        private static WeaponStationEntry? PickCatalogStation(
+            IReadOnlyList<WeaponStationEntry> stations,
+            bool wantIr)
         {
-            ScanMissiles.Clear();
-            AppendUniqueMissiles(warning.knownMissiles);
-            if (!includeUnknown)
-                return;
-
-            List<Missile>? unknown = ResolveUnknownMissiles(warning);
-            if (unknown == null)
-                return;
-
-            AppendUniqueMissiles(unknown);
-        }
-
-        private static void AppendUniqueMissiles(List<Missile> source)
-        {
-            for (int i = 0; i < source.Count; i++)
+            for (int i = 0; i < stations.Count; i++)
             {
-                Missile? missile = source[i];
-                if (missile == null || ContainsMissile(missile))
+                WeaponStationEntry entry = stations[i];
+                if (wantIr && !entry.IsIr)
                     continue;
-
-                ScanMissiles.Add(missile);
-            }
-        }
-
-        private static bool ContainsMissile(Missile missile)
-        {
-            for (int j = 0; j < ScanMissiles.Count; j++)
-            {
-                if (ScanMissiles[j] == missile)
-                    return true;
+                if (!wantIr && !entry.IsRadar)
+                    continue;
+                return entry;
             }
 
-            return false;
-        }
-
-        private static List<Missile>? ResolveUnknownMissiles(MissileWarning warning)
-        {
-            _unknownMissilesField ??= typeof(MissileWarning).GetField(
-                "unknownMissiles",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-
-            return _unknownMissilesField?.GetValue(warning) as List<Missile>;
+            return null;
         }
 
         private static bool PassesPreviewRangeGate(float dist, float previewRangeCap)
@@ -583,25 +594,22 @@ namespace NOCS.HardKill
             return (acPos - missile.rb.position).magnitude;
         }
 
-        private static bool IsEngageableThreatOnSelf(Missile? missile, PersistentID selfId, FactionHQ? playerHq)
+        private static bool IsEngageableThreatOnSelf(
+            Aircraft aircraft,
+            MissileWarning warning,
+            Missile? missile,
+            PersistentID selfId,
+            FactionHQ? playerHq)
         {
-            if (!IsSalvoThreatOnSelf(missile, selfId, playerHq))
+            if (!NocsGuard.IsValidMissile(missile))
                 return false;
 
-            SeekerKind kind = SeekerParamCache.ResolveSeekerKind(missile);
-            return SeekerParamCache.IsRadarSeeker(kind);
-        }
-
-        private static bool IsInsideNoseFov(Vector3 noseForward, Vector3 aircraftPos, Vector3 threatPos)
-        {
-            Vector3 toThreat = threatPos - aircraftPos;
-            float sqr = toThreat.sqrMagnitude;
-            if (sqr < 0.0001f)
-                return false;
-
-            float invLen = 1f / Mathf.Sqrt(sqr);
-            float cos = Vector3.Dot(noseForward, toThreat * invLen);
-            return cos >= FovHalfCos;
+            return MwsRwrGate.IsEngageableRwrThreat(
+                aircraft,
+                warning,
+                missile!,
+                selfId,
+                playerHq);
         }
 
         private static void TryAddUnique(List<Missile> buffer, Missile missile)
@@ -616,6 +624,43 @@ namespace NOCS.HardKill
                 return;
 
             buffer.Add(missile);
+        }
+
+        private static void TryAddSalvoCandidate(int scanIndex, float dist, ref int candidateCount)
+        {
+            if (candidateCount < MaxThreats)
+            {
+                CandidateIndices[candidateCount] = scanIndex;
+                CandidateDist[candidateCount] = dist;
+                candidateCount++;
+                return;
+            }
+
+            int farthest = 0;
+            float farthestDist = CandidateDist[0];
+            for (int k = 1; k < MaxThreats; k++)
+            {
+                if (CandidateDist[k] <= farthestDist)
+                    continue;
+
+                farthest = k;
+                farthestDist = CandidateDist[k];
+            }
+
+            if (dist >= farthestDist)
+                return;
+
+            CandidateIndices[farthest] = scanIndex;
+            CandidateDist[farthest] = dist;
+        }
+
+        private static void TrimToNearest(List<Missile> buffer, Vector3 acPos, int keep)
+        {
+            SortBufferByDistance(buffer, acPos);
+            if (buffer.Count <= keep)
+                return;
+
+            buffer.RemoveRange(keep, buffer.Count - keep);
         }
     }
 }

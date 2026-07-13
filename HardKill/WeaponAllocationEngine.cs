@@ -282,6 +282,24 @@ namespace NOCS.HardKill
             return true;
         }
 
+        internal bool TryEstablishCurrentThreatTrack(Aircraft aircraft)
+        {
+            if (!NocsGuard.CanMutateLocalWeapons(aircraft))
+                return false;
+
+            Missile? threat = CurrentThreat;
+            if (!NocsGuard.IsValidUnit(aircraft) || aircraft!.weaponManager == null || threat == null)
+                return false;
+
+            if (!_activeStation.HasValue && !SelectActiveStation(aircraft))
+                return false;
+
+            if (!_activeStation.HasValue)
+                return false;
+
+            return EnsureThreatTracked(aircraft, _activeStation.Value, threat);
+        }
+
         internal void RepointTargets(Aircraft aircraft, Missile? threat = null)
         {
             if (!NocsGuard.CanMutateLocalWeapons(aircraft))
@@ -306,12 +324,20 @@ namespace NOCS.HardKill
             if (wm == null || !NocsGuard.IsValidMissile(threat))
                 return false;
 
-            wm.SetActiveStation(entry.Index);
-            wm.ClearTargetList();
-            wm.AddTargetList(threat);
-            TrackingCmdDebounce.TrySend(aircraft, threat.persistentID);
-            wm.TargetListChanged();
-            return wm.CheckIsTarget(threat);
+            try
+            {
+                wm.SetActiveStation(entry.Index);
+                wm.ClearTargetList();
+                wm.AddTargetList(threat);
+                TrackingCmdDebounce.TrySend(aircraft, threat.persistentID);
+                wm.TargetListChanged();
+                return wm.CheckIsTarget(threat);
+            }
+            catch (System.Exception ex)
+            {
+                NOCS.Util.NocsDiagLog.ExceptionOnce("WeaponAllocationEngine.EnsureThreatTracked", ex);
+                return false;
+            }
         }
 
         internal bool TrySalvoStep(
@@ -415,14 +441,26 @@ namespace NOCS.HardKill
                         return launchesStarted > 0;
                     }
 
+                    IReadOnlyList<WeaponStationEntry> stationList = WeaponStationCatalog.Build(aircraft);
+
+                    // Own IR ammo remaining: never skip / never fall to radar — wait for Ready/geometry.
+                    if (IncomingThreatPolicy.ShouldUseIrInterceptPhase(stationList))
+                    {
+                        if (launchesStarted > 0)
+                            _salvoGate.BeginWait(ResolveInterShotWait(aircraft, defensiveStation));
+                        _queueComplete = false;
+                        return launchesStarted > 0;
+                    }
+
                     if (!WeaponStationCatalog.HasLaunchableStation(aircraft))
                     {
                         if (launchesStarted > 0)
                             _salvoGate.BeginWait(ResolveInterShotWait(aircraft, defensiveStation));
+                        _queueComplete = false;
                         return launchesStarted > 0;
                     }
 
-                    // Launch failed with Ready stations — skip this threat once; never wrap in-frame.
+                    // Radar phase: launch failed with Ready stations — skip this threat once.
                     if (!TryAdvanceQueueForward(aircraft))
                         break;
                     continue;
@@ -681,9 +719,19 @@ namespace NOCS.HardKill
                 return false;
             }
 
-            // Hard MP rule: exhaust IR interceptors before any radar station.
-            WeaponStationEntry? picked = PickFirstReadyStation(stations, wantIr: true)
-                ?? PickFirstReadyStation(stations, wantIr: false);
+            // Own IR always first while any IR ammo remains; radar only after IR exhausted.
+            bool irPhase = IncomingThreatPolicy.ShouldUseIrInterceptPhase(stations);
+            WeaponStationEntry? picked;
+            if (irPhase)
+            {
+                picked = PickFirstReadyStation(stations, wantIr: true)
+                    ?? PickFirstStationWithAmmo(stations, wantIr: true);
+            }
+            else
+            {
+                picked = PickFirstReadyStation(stations, wantIr: false)
+                    ?? PickFirstStationWithAmmo(stations, wantIr: false);
+            }
 
             if (picked == null)
             {
@@ -708,7 +756,28 @@ namespace NOCS.HardKill
                     continue;
 
                 WeaponStation station = entry.Station;
-                if (station.Ammo <= 0)
+                if (station.Ammo <= 0 || !station.Ready())
+                    continue;
+
+                return entry;
+            }
+
+            return null;
+        }
+
+        private static WeaponStationEntry? PickFirstStationWithAmmo(
+            IReadOnlyList<WeaponStationEntry> stations,
+            bool wantIr)
+        {
+            for (int i = 0; i < stations.Count; i++)
+            {
+                WeaponStationEntry entry = stations[i];
+                if (wantIr && !entry.IsIr)
+                    continue;
+                if (!wantIr && !entry.IsRadar)
+                    continue;
+
+                if (entry.Station.Ammo <= 0)
                     continue;
 
                 return entry;
@@ -723,22 +792,19 @@ namespace NOCS.HardKill
             if (stations.Count == 0)
                 return false;
 
-            if (HasIrAmmo(stations))
-                return TryLaunchFromStationGroup(aircraft, threat, stations, wantIr: true);
-
-            return TryLaunchFromStationGroup(aircraft, threat, stations, wantIr: false);
-        }
-
-        private static bool HasIrAmmo(IReadOnlyList<WeaponStationEntry> stations)
-        {
-            for (int i = 0; i < stations.Count; i++)
+            if (IncomingThreatPolicy.ShouldUseIrInterceptPhase(stations))
             {
-                WeaponStationEntry entry = stations[i];
-                if (entry.IsIr && entry.Station.Ammo > 0)
-                    return true;
+                if (!IncomingThreatPolicy.IsEngageableByIrPhase(aircraft, threat))
+                    return false;
+
+                return TryLaunchFromStationGroup(aircraft, threat, stations, wantIr: true);
             }
 
-            return false;
+            // Radar pylons — ARH/SARH only.
+            if (!IncomingThreatPolicy.IsEngageableByRadarStation(threat))
+                return false;
+
+            return TryLaunchFromStationGroup(aircraft, threat, stations, wantIr: false);
         }
 
         private bool TryLaunchFromStationGroup(
@@ -906,7 +972,17 @@ namespace NOCS.HardKill
 
             // Reserve before LaunchMount — sync onRegisterMissile may fire inside LaunchMount.
             HardKillController.NotifySalvoLaunchCommitted();
-            station.LaunchMount(aircraft, threat, aim);
+            try
+            {
+                station.LaunchMount(aircraft, threat, aim);
+            }
+            catch (System.Exception ex)
+            {
+                NOCS.Util.NocsDiagLog.ExceptionOnce("WeaponAllocationEngine.LaunchMount", ex);
+                HardKillController.RollbackSalvoLaunchCommitted();
+                WeaponStationCatalog.InvalidateFrameCache();
+                return false;
+            }
 
             bool ammoConsumed = station.Ammo < ammoBefore;
             bool callbackConsumed = HardKillController.PendingOwnLaunchesCount <= pendingBefore;

@@ -152,6 +152,7 @@ namespace NOCS.HardKill
             Scratch.Clear();
             MwsThreatFilter.InvalidateFrameCache();
             CombatHudMarkerPlacement.InvalidateFrameCache();
+            AircraftFlareInventory.Invalidate();
         }
 
         internal static bool IsEligibleStation(WeaponStation? station, Aircraft aircraft)

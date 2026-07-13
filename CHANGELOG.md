@@ -6,6 +6,169 @@ Format follows [Keep a Changelog](https://keepachangelog.com/). Versions use [Se
 
 ## [Unreleased]
 
+## [0.6.12] — 2026-07-13
+
+### Build
+
+- Display version: `0.6.12QV`
+- BepInPlugin semver: `0.6.12`
+
+## [0.5.47] — 2026-07-13
+
+### Fixed
+
+- **Inbound IR flare gate** — with `X = IrInterceptBlockedAboveFlares > 0`, engage inbound IR while HUD flares **&lt; X** (no longer requires `EngageIrThreats`). `X = 0` uses `EngageIrThreats` only.
+- **Flare count** — matches game `FlareEjector.GetAmmo` sum (same as `CountermeasureStation.CountAmmo` / HUD ammo), cached per frame.
+- **IR-first salvo** — while own IR ammo remains, failed IR launch waits (never skips threat / never falls back to radar mid-IR).
+- **ASE station** — fire-control weapon resolve follows IR-first catalog (ignores unrelated player weapon selection).
+
+### Build
+
+- Display version: `0.5.47QV`
+- BepInPlugin semver: `0.5.47`
+
+## [0.5.46] — 2026-07-13
+
+### Fixed
+
+- **Separated flare gate from own-weapon priority**
+  - `IrInterceptBlockedAboveFlares` (X): inbound IR threats only while remaining flares **&lt; X** (needs `EngageIrThreats`). `0` = no flare gate.
+  - Own interceptor order is always **IR pylons first** while any IR ammo remains; radar pylons only after IR is empty. Flare count never switches station type.
+
+### Build
+
+- Display version: `0.5.46QV`
+- BepInPlugin semver: `0.5.46`
+
+## [0.5.45] — 2026-07-13
+
+### Fixed
+
+- **`IrInterceptBlockedAboveFlares` fail-safe** — flare reserve prefers radar for ARH/SARH only when radar ammo exists. IR pylons are always used when flares are at/below threshold, radar ammo is empty, or the inbound threat requires IR engagement (`EngageIrThreats`). Safe at any slider value (0 = off).
+
+### Build
+
+- Display version: `0.5.45QV`
+- BepInPlugin semver: `0.5.45`
+
+## [0.5.44] — 2026-07-13
+
+### Fixed
+
+- **IR-first salvo** — while IR pylon ammo remains, active station never falls back to radar (even when IR slots are reloading). `PickFirstReadyStation` now requires `Ready()`.
+- **Salvo continuation** — after the 2-shot hardware window, session keeps pulling new RWR threats during pair lock; failed IR cooldown waits instead of skipping threats or ending early.
+- **Flare reserve gate** — default `IrInterceptBlockedAboveFlares` is `0` (off). IR-first is restored out of the box; set the slider to enable flare conservation.
+
+### Build
+
+- Display version: `0.5.44QV`
+- BepInPlugin semver: `0.5.44`
+
+## [0.5.43] — 2026-07-13
+
+### Added
+
+- **`IrInterceptBlockedAboveFlares`** (section `4. Signal & Tracking`, default `4`, slider 0–128) — while remaining IR flares exceed this count, Hard-Kill skips IR pylons and uses radar intercept only. `0` disables the gate.
+
+### Build
+
+- Display version: `0.5.43QV`
+- BepInPlugin semver: `0.5.43`
+
+## [0.5.42] — 2026-07-13
+
+### Fixed
+
+- **Station priority** — IR pylons engage all allowed inbound (IR + ARH/SARH) while IR ammo remains; radar pylons only after IR exhausted, ARH/SARH only. Per-threat nose FOV unchanged (IR 80° / radar 50°).
+
+### Build
+
+- Display version: `0.5.42QV`
+- BepInPlugin semver: `0.5.42`
+
+## [0.5.41] — 2026-07-13
+
+### Added
+
+- **`EngageIrThreats`** (section `4. Signal & Tracking`, default `false`) — when enabled, Hard-Kill engages IR inbound on RWR with **80°** nose FOV; ARH/SARH remain **50°**. Mixed salvo picks IR interceptors for IR threats and radar stations for ARH/SARH.
+
+### Build
+
+- Display version: `0.5.41QV`
+- BepInPlugin semver: `0.5.41`
+
+## [0.5.40] — 2026-07-12
+
+### Changed
+
+- **POTENTIAL HIT cue** — shown only when RWR threat is in weapon reach, maneuver time remains, and aim is inside an expanded envelope margin (not merely “ASE visible but not SHOOT”). Otherwise cue hidden.
+
+### Fixed
+
+- **RWR-only anti-cheat gate** — HardKill threat collect, ASE sample, SHOOT/salvo gates require missiles on local `MissileWarning` lists (`knownMissiles` + RWR `unknownMissiles` from `LockedByMissile`). No salvo-scratch union outside RWR; no HUD/fire without RWR picture.
+
+### Build
+
+- Display version: `0.5.40QV`
+- BepInPlugin semver: `0.5.40`
+
+## [0.5.39] — 2026-07-12
+
+### Fixed
+
+- **Third-person zoom blocked salvo** — outside cockpit, SHOOT gate uses world velocity/nose aim instead of stale FlightHud gun-cross (canvas off in chase/relative; zoom misaligns screen envelopes). Cockpit + optional `RequireAseScreenShoot` unchanged.
+
+### Build
+
+- Display version: `0.5.39QV`
+- BepInPlugin semver: `0.5.39`
+
+## [0.5.38] — 2026-07-12
+
+### Fixed
+
+- **Manual hotkey dead (RightShift + /)** — `NocsHotKey.WasPressed` no longer blocks modifier combos when `Input.inputString` contains the same character on the key-down frame (Unity quirk). Chat guard kept only for bare keys without modifier.
+
+### Build
+
+- Display version: `0.5.38QV`
+- BepInPlugin semver: `0.5.38`
+
+## [0.5.37] — 2026-07-12
+
+### Fixed
+
+- **Ghost auto-salvo with AutoEngage off** — session continuation no longer calls `RunSalvo` on `shootOpen` alone unless the session was started by hotkey (`ManualEngagement`) or AutoEngage is still enabled. Auto path uses strict ASE sample (no salvo-only world-aim bypass).
+- **Session start without target lock** — `TryBeginSession` fail-closed: WM track must succeed via `TryEstablishCurrentThreatTrack` before session activates; snapshot restored on failure.
+- **Hotkey misfire in chat** — `NocsHotKey.WasPressed` ignores frames with `Input.inputString` (typed `/` etc.).
+
+### Build
+
+- Display version: `0.5.37QV`
+- BepInPlugin semver: `0.5.37`
+
+## [0.5.36] — 2026-07-12
+
+### Fixed
+
+- **Intermittent skipped incoming missile** — fire-control scratch now unions ASE preview with salvo MWS collect so threats visible to salvo queue also drive SHOOT geometry. Salvo raw collect keeps nearest eight in FOV (not first eight in scan order). Active session continues firing when preview drops a threat mid-salvo; salvo-only threats fall back to world-aim SHOOT when ASE sample is empty.
+
+### Build
+
+- Display version: `0.5.36QV`
+- BepInPlugin semver: `0.5.36`
+
+## [0.5.35] — 2026-07-12
+
+### Fixed
+
+- **Stability hardening** — fail-closed try/catch isolation on host tick, HUD root (TrueNotch vs HardKill separated), HardKill/ASE/launch/track/restore/binder, TrueNotch apply, Warning TTI, unit lookup, and NocsGuard local-player checks. Rate-limited `NocsDiagLog` errors; game API failures (`LaunchMount`, `CmdUpdateTrackingInfo`, WM track) no longer abort the frame.
+
+### Build
+
+- Display version: `0.5.35QV`
+- BepInPlugin semver: `0.5.35`
+
 ## [0.5.34] — 2026-07-12
 
 ### Fixed

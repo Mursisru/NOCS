@@ -1,4 +1,6 @@
+using System;
 using Mirage.Serialization;
+using NOCS.Util;
 
 namespace NOCS.Core
 {
@@ -10,11 +12,19 @@ namespace NOCS.Core
             if (!id.IsValid)
                 return false;
 
-            if (!UnitRegistry.TryGetUnit(new PersistentID?(id), out Unit resolved) || resolved == null)
-                return false;
+            try
+            {
+                if (!UnitRegistry.TryGetUnit(new PersistentID?(id), out Unit resolved) || resolved == null)
+                    return false;
 
-            unit = resolved;
-            return true;
+                unit = resolved;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsUnitLookup.TryGetUnit", ex);
+                return false;
+            }
         }
 
         internal static bool TryGetLiveUnit(PersistentID id, out Unit unit)
@@ -22,13 +32,21 @@ namespace NOCS.Core
             if (!TryGetUnit(id, out unit))
                 return false;
 
-            if (unit.disabled)
+            try
+            {
+                if (unit.disabled)
+                {
+                    unit = null!;
+                    return false;
+                }
+
+                return true;
+            }
+            catch
             {
                 unit = null!;
                 return false;
             }
-
-            return true;
         }
     }
 }

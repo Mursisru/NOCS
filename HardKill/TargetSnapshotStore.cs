@@ -1,13 +1,28 @@
+using System;
 using System.Collections.Generic;
 using Mirage.Serialization;
 using NOCS.Config;
 using NOCS.Core;
+using NOCS.Util;
 
 namespace NOCS.HardKill
 {
     internal static class TargetSnapshotStore
     {
         internal static TargetSnapshot Capture(Aircraft aircraft)
+        {
+            try
+            {
+                return CaptureCore(aircraft);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("TargetSnapshotStore.Capture", ex);
+                return TargetSnapshot.Empty;
+            }
+        }
+
+        private static TargetSnapshot CaptureCore(Aircraft aircraft)
         {
             TargetSnapshot snapshot = TargetSnapshot.Empty;
             if (!NocsGuard.CanMutateLocalWeapons(aircraft))

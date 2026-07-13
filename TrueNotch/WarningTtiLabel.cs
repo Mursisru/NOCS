@@ -19,6 +19,18 @@ namespace NOCS.TrueNotch
 
         internal static void Apply(ThreatItem item, Missile missile, Aircraft aircraft)
         {
+            try
+            {
+                ApplyCore(item, missile, aircraft);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("WarningTtiLabel.Apply", ex);
+            }
+        }
+
+        private static void ApplyCore(ThreatItem item, Missile missile, Aircraft aircraft)
+        {
             if (!NocsConfigCache.WarningTtiEnabled)
                 return;
 

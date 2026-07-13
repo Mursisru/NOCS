@@ -1,3 +1,4 @@
+using System;
 using NuclearOption.Networking;
 using UnityEngine;
 
@@ -7,12 +8,26 @@ namespace NOCS.Core
     {
         internal static bool IsValidUnit(Unit? unit)
         {
-            return unit != null && !unit.disabled;
+            try
+            {
+                return unit != null && !unit.disabled;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         internal static bool IsValidMissile(Missile? missile)
         {
-            return missile != null && !missile.disabled && missile.rb != null;
+            try
+            {
+                return missile != null && !missile.disabled && missile.rb != null;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         internal static bool IsLocalPlayerAircraft(Aircraft? aircraft)
@@ -20,15 +35,22 @@ namespace NOCS.Core
             if (!IsValidUnit(aircraft))
                 return false;
 
-            // Canonical once GameManager.SetLocalPlayer has run.
-            if (GameManager.GetLocalAircraft(out Aircraft local) && local != null)
-                return local == aircraft;
+            try
+            {
+                // Canonical once GameManager.SetLocalPlayer has run.
+                if (GameManager.GetLocalAircraft(out Aircraft local) && local != null)
+                    return local == aircraft;
 
-            // MP spawn race: Aircraft.OnStartClient / CombatHUD.SetAircraft can run
-            // before Player.OnStartLocalPlayer sets GameManager._localPlayer.
-            // Match vanilla CheckIfLocalSim — Mirage IsLocalPlayer on the owner.
-            Player? owner = aircraft!.Player;
-            return owner != null && owner.IsLocalPlayer;
+                // MP spawn race: Aircraft.OnStartClient / CombatHUD.SetAircraft can run
+                // before Player.OnStartLocalPlayer sets GameManager._localPlayer.
+                // Match vanilla CheckIfLocalSim — Mirage IsLocalPlayer on the owner.
+                Player? owner = aircraft!.Player;
+                return owner != null && owner.IsLocalPlayer;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         internal static bool CanMutateLocalWeapons(Aircraft? aircraft)
@@ -36,8 +58,15 @@ namespace NOCS.Core
             if (!IsLocalPlayerAircraft(aircraft))
                 return false;
 
-            // MountedMissile only sends CmdLaunchMissile with authority (or Rpc on server).
-            return aircraft!.HasAuthority || aircraft.IsServer;
+            try
+            {
+                // MountedMissile only sends CmdLaunchMissile with authority (or Rpc on server).
+                return aircraft!.HasAuthority || aircraft.IsServer;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

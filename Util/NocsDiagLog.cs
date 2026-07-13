@@ -30,7 +30,7 @@ namespace NOCS.Util
             if (exception == null)
                 return;
 
-            string key = context + ":" + exception.GetType().FullName;
+            string key = context + ":" + exception.GetType().FullName + ":" + exception.Message;
             float now = Time.realtimeSinceStartup;
             if (key == _lastExceptionKey && now - _lastExceptionTime < ExceptionLogCooldownSec)
                 return;
@@ -38,7 +38,7 @@ namespace NOCS.Util
             _lastExceptionKey = key;
             _lastExceptionTime = now;
 
-            string message = "[NOCS] Harmony/" + context + ": " + exception.Message;
+            string message = "[NOCS] " + context + ": " + exception.GetType().Name + " — " + exception.Message;
             if (NocsPlugin.ModLogger != null)
                 NocsPlugin.ModLogger.LogError(message);
             else

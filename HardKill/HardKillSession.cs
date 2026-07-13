@@ -5,6 +5,7 @@ namespace NOCS.HardKill
         internal const float PendingLaunchTimeoutSec = 2f;
 
         internal bool Active;
+        internal bool ManualEngagement;
         internal bool RestorePending;
         internal TargetSnapshot SavedTargets;
         internal int PendingOwnLaunches;
@@ -14,6 +15,7 @@ namespace NOCS.HardKill
         internal void Reset()
         {
             Active = false;
+            ManualEngagement = false;
             RestorePending = false;
             SavedTargets = TargetSnapshot.Empty;
             PendingOwnLaunches = 0;

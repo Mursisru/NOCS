@@ -191,6 +191,24 @@ namespace NOCS.HardKill
             return _envelopeCount > 0;
         }
 
+        internal static bool AnyEnvelopeInWeaponRange(WeaponStation? station)
+        {
+            if (station == null)
+                return true;
+
+            for (int i = 0; i < _envelopeCount; i++)
+            {
+                ThreatEnvelope envelope = Envelopes[i];
+                if (!envelope.Valid)
+                    continue;
+
+                if (InterceptGeometry.IsInEnvelope(envelope.DistanceMeters, station))
+                    return true;
+            }
+
+            return false;
+        }
+
         private static bool TryBuildSingleThreatCircle(out Vector2 center, out float radiusPx)
         {
             center = default;

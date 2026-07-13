@@ -17,6 +17,8 @@ namespace NOCS.Config
         internal static KeyCode HotKey = KeyCode.Slash;
         internal static WeaponPriority WeaponPriority = WeaponPriority.IR_First;
         internal static WeaponFilterMode WeaponFilterMode = WeaponFilterMode.AntiMissileOnly;
+        internal static bool EngageIrThreats;
+        internal static int IrInterceptBlockedAboveFlares = 4;
 
         internal static bool RenderAseCircle = false;
         internal static bool RenderRadialText = true;
@@ -80,6 +82,8 @@ namespace NOCS.Config
             HotKey = s.HotKey;
             WeaponPriority = s.WeaponPriority;
             WeaponFilterMode = s.WeaponFilterMode;
+            EngageIrThreats = s.EngageIrThreats;
+            IrInterceptBlockedAboveFlares = Mathf.Max(0, s.IrInterceptBlockedAboveFlares);
 
             RenderAseCircle = s.RenderAseCircle;
             RenderRadialText = s.RenderRadialText;

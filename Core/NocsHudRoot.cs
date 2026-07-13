@@ -1,5 +1,7 @@
+using System;
 using NOCS.HardKill;
 using NOCS.TrueNotch;
+using NOCS.Util;
 using UnityEngine;
 
 namespace NOCS.Core
@@ -20,8 +22,15 @@ namespace NOCS.Core
             if (Instance == this)
                 Instance = null;
 
-            TrueNotchHudDriver.DisposeViews();
-            HardKillController.DisposeViews();
+            try
+            {
+                TrueNotchHudDriver.DisposeViews();
+                HardKillController.DisposeViews();
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsHudRoot.OnDestroy", ex);
+            }
         }
 
         private void LateUpdate()
@@ -36,8 +45,24 @@ namespace NOCS.Core
                 return;
             _lastTickFrame = frame;
 
-            TrueNotchHudDriver.RunTick(dt);
-            HardKillController.RunTick(dt);
+            // Isolate subsystems — one failure must not skip the other.
+            try
+            {
+                TrueNotchHudDriver.RunTick(dt);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsHudRoot.TrueNotch", ex);
+            }
+
+            try
+            {
+                HardKillController.RunTick(dt);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsHudRoot.HardKill", ex);
+            }
         }
     }
 }

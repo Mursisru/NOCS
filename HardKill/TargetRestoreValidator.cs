@@ -1,6 +1,8 @@
+using System;
 using Mirage.Serialization;
 using NOCS.Config;
 using NOCS.Core;
+using NOCS.Util;
 
 namespace NOCS.HardKill
 {
@@ -17,7 +19,19 @@ namespace NOCS.HardKill
             if (!snapshot.Captured)
                 return;
 
-            WeaponManager wm = aircraft.weaponManager;
+            try
+            {
+                RestoreCore(aircraft, in snapshot);
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("TargetRestoreValidator.Restore", ex);
+            }
+        }
+
+        private static void RestoreCore(Aircraft aircraft, in TargetSnapshot snapshot)
+        {
+            WeaponManager wm = aircraft.weaponManager!;
             wm.ClearTargetList();
 
             FactionHQ? hq = aircraft.NetworkHQ;
@@ -33,7 +47,15 @@ namespace NOCS.HardKill
                     continue;
 
                 bool accurate = hq != null && hq.IsTargetPositionAccurate(unit, 20f);
-                bool los = unit.LineOfSight(aircraft.transform.position, 1000f);
+                bool los = false;
+                try
+                {
+                    los = unit.LineOfSight(aircraft.transform.position, 1000f);
+                }
+                catch
+                {
+                    continue;
+                }
 
                 if (!accurate || !los)
                 {

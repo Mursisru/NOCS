@@ -122,22 +122,36 @@ namespace NOCS.HardKill
             Aircraft aircraft,
             WeaponStation? defensiveStation)
         {
-            if (!sample.Valid || sample.ThreatCount <= 0 || !NocsGuard.IsLocalPlayerAircraft(aircraft))
+            try
             {
-                HideAll();
-                return;
+                if (!sample.Valid || sample.ThreatCount <= 0 || !NocsGuard.IsLocalPlayerAircraft(aircraft))
+                {
+                    HideAll();
+                    return;
+                }
+
+                CueMode mode = ResolveCueMode(in sample, aircraft, defensiveStation);
+                if (NocsConfigCache.RenderAseCircle)
+                    ApplyRing(in sample, mode);
+                else
+                    SetRingVisible(false);
+
+                if (NocsConfigCache.RenderRadialText)
+                    ApplyStatusCue(in sample, aircraft, defensiveStation, mode);
+                else
+                    SetStatusVisible(false);
             }
-
-            CueMode mode = ResolveCueMode(in sample, aircraft, defensiveStation);
-            if (NocsConfigCache.RenderAseCircle)
-                ApplyRing(in sample, mode);
-            else
-                SetRingVisible(false);
-
-            if (NocsConfigCache.RenderRadialText)
-                ApplyStatusCue(in sample, aircraft, defensiveStation, mode);
-            else
-                SetStatusVisible(false);
+            catch (System.Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("AseCircleView.Apply", ex);
+                try
+                {
+                    HideAll();
+                }
+                catch
+                {
+                }
+            }
         }
 
         internal void Dispose()
@@ -571,7 +585,10 @@ namespace NOCS.HardKill
             if (HotTriggerGate.IsAseShootCueActive(in sample, defensiveStation, aircraft))
                 return CueMode.Shoot;
 
-            return CueMode.PotentialHit;
+            if (HotTriggerGate.IsPotentialHitCueActive(in sample, defensiveStation, aircraft))
+                return CueMode.PotentialHit;
+
+            return CueMode.Hidden;
         }
 
         private static bool TryResolveWeaponHint(out Text? hint)

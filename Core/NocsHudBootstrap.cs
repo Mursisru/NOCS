@@ -1,3 +1,5 @@
+using System;
+using NOCS.Util;
 using UnityEngine;
 
 namespace NOCS.Core
@@ -6,12 +8,19 @@ namespace NOCS.Core
     {
         internal static void EnsureAttached()
         {
-            GameObject? host = ResolveHostObject();
-            if (host == null)
-                return;
+            try
+            {
+                GameObject? host = ResolveHostObject();
+                if (host == null)
+                    return;
 
-            if (host.GetComponent<NocsHudRoot>() == null)
-                host.AddComponent<NocsHudRoot>();
+                if (host.GetComponent<NocsHudRoot>() == null)
+                    host.AddComponent<NocsHudRoot>();
+            }
+            catch (Exception ex)
+            {
+                NocsDiagLog.ExceptionOnce("NocsHudBootstrap.EnsureAttached", ex);
+            }
         }
 
         private static GameObject? ResolveHostObject()

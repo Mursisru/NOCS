@@ -23,6 +23,11 @@ namespace NOCS.Util
             if (modifier != KeyCode.None && !Input.GetKey(modifier))
                 return false;
 
+            // Chat-only guard: bare key without modifier (e.g. "/" in chat).
+            // Never block when a modifier is held — GetKeyDown and inputString share the same frame for "/".
+            if (modifier == KeyCode.None && !string.IsNullOrEmpty(Input.inputString))
+                return false;
+
             return Input.GetKeyDown(key);
         }
     }
